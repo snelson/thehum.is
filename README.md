@@ -25,6 +25,8 @@ layers drift across the stereo field on slow paths of their own. It
 follows the ring: it leans toward the bright side and swells with hot spots.
 While it plays, the void, ring
 and sound breathe together on the year tone slowed 10 more octaves (one
-swell every ~7.5 s), and the title pulses. Debug hook only with #humdebug.
+swell every ~7.5 s), and the title pulses.
+Now and then upper layers pulse at their own pitch slowed into rhythm, so
+the chord is heard as a polyrhythm against the breath (major: 4:5:6 per bar). Debug hook only with #humdebug.
 
 When thehum.studio is live, add a quiet link beside thehum.works in the footer.

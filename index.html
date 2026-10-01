@@ -593,9 +593,10 @@
       const lg = ac.createGain(); lg.gain.value = UPPER_GAIN[i] * 0.2;
       const sp = ac.createStereoPanner(); drift(sp.pan, UPPER_PAN[i] * 0.6, 0.55);
       lfo.connect(lg); lg.connect(g.gain);
-      osc.connect(g); g.connect(sp); sp.connect(filter);
+      const trem = ac.createGain(); trem.gain.value = 1;
+      osc.connect(g); g.connect(trem); trem.connect(sp); sp.connect(filter);
       osc.start(now); lfo.start(now + Math.random() * UPPER_PERIODS[i]); sources.push(osc, lfo);
-      return { osc, r0: ratio, vib: vibrato([osc.detune]), kind: 'upper' };
+      return { osc, trem, r0: ratio, f: ROOT * snap(ratio, CHORDS[chord].tones, false), vib: vibrato([osc.detune]), kind: 'upper' };
     });
     // A voice-like source: many harmonics rolling off ~1/n^1.7, like vocal folds rather than an organ pipe.
     const vh = new Float32Array(16); for (let n = 1; n < 16; n++) vh[n] = Math.pow(n, -1.7);
@@ -622,8 +623,9 @@
       const lfo = ac.createOscillator(); lfo.frequency.value = 1 / CHOIR_PERIODS[i];
       const lg = ac.createGain(); lg.gain.value = CHOIR_GAIN[i] * 0.2;
       const phrase = ac.createGain(); phrase.gain.value = 1;                                 // breath gaps
+      const trem = ac.createGain(); trem.gain.value = 1;                                     // rhythm pulses
       const sp = ac.createStereoPanner(); drift(sp.pan, CHOIR_PAN[i] * 0.6, 0.5);
-      lfo.connect(lg); lg.connect(g.gain); g.connect(phrase); phrase.connect(sp); sp.connect(nasal);
+      lfo.connect(lg); lg.connect(g.gain); g.connect(phrase); phrase.connect(trem); trem.connect(sp); sp.connect(nasal);
       const oscs = [];
       for (const cents of [-6, 0, 5]) {                                                      // a few singers on one note
         const osc = ac.createOscillator(); osc.setPeriodicWave(vox);
@@ -650,7 +652,7 @@
       air.connect(ahp); ahp.connect(am); am.connect(al); al.connect(g);
       air.start(now, Math.random() * 2); pulse.start(now); off.start(now); sources.push(air, pulse, off);
       lfo.start(now + Math.random() * CHOIR_PERIODS[i]); sources.push(lfo);
-      return { phrase, oscs, pulse, vib: vibrato(oscs.map((o) => o.detune)), kind: 'choir', r0: ratio, f: ROOT * snap(ratio, CHORDS[chord].tones, false) };
+      return { phrase, trem, oscs, pulse, vib: vibrato(oscs.map((o) => o.detune)), kind: 'choir', r0: ratio, f: ROOT * snap(ratio, CHORDS[chord].tones, false) };
     });
     // Strings: a bowed tone (bright 1/n partials, softened), three desks a few cents apart,
     // each with its own vibrato that only opens once the note has sounded a while.
@@ -661,7 +663,8 @@
       const g = ac.createGain(); g.gain.value = 0;
       const body = ac.createBiquadFilter(); body.type = 'lowpass'; body.frequency.value = 2400; body.Q.value = 0.3;
       const sp = ac.createStereoPanner(); drift(sp.pan, STRING_PAN[i] * 0.7, 0.4);
-      g.connect(body); body.connect(sp); sp.connect(filter);
+      const trem = ac.createGain(); trem.gain.value = 1;
+      g.connect(trem); trem.connect(body); body.connect(sp); sp.connect(filter);
       const oscs = [];
       for (const cents of [-8, 0, 7]) {
         const osc = ac.createOscillator(); osc.setPeriodicWave(bow); osc.frequency.value = f; osc.detune.value = cents;
@@ -669,7 +672,7 @@
         const og = ac.createGain(); og.gain.value = 1 / 3;
         osc.connect(og); og.connect(g); osc.start(now); sources.push(osc); oscs.push(osc);
       }
-      return { g, oscs, r0: ratio, peak: STRING_GAIN[i], vib: vibrato(oscs.map((o) => o.detune)), busy: false };
+      return { g, trem, oscs, r0: ratio, f, peak: STRING_GAIN[i], vib: vibrato(oscs.map((o) => o.detune)), busy: false };
     });
     // Colour: the harmonic 7th, below the fifth, mostly absent.
     const col = ac.createOscillator(); col.setPeriodicWave(pw); col.frequency.value = ROOT * 7 / 4;
@@ -766,7 +769,7 @@
       };
       const own = () => [Math.random() * spread, dur * (0.7 + Math.random() * 0.6)];
       graph.voices.forEach((v, i) => { const [o, d] = own(); glide(v.osc.frequency, ROOT * snap(MAIN_R0[i], tones, i === 0), o, d); });
-      graph.upper.forEach((u) => { const [o, d] = own(); glide(u.osc.frequency, ROOT * snap(u.r0, tones, false), o, d); });
+      graph.upper.forEach((u) => { const [o, d] = own(); u.f = ROOT * snap(u.r0, tones, false); glide(u.osc.frequency, u.f, o, d); });
       graph.choir.forEach((c) => {
         const [o, d] = own();                                            // one person: their singers move together
         c.f = ROOT * snap(c.r0, tones, false); c.until = t + o + d + 0.3;
@@ -774,7 +777,7 @@
         glide(c.pulse.frequency, c.f, o, d);
       });
       graph.strings.forEach((sg) => {
-        const [o, d] = own(), f = ROOT * snap(sg.r0, tones, false);
+        const [o, d] = own(), f = ROOT * snap(sg.r0, tones, false); sg.f = f;
         for (const os of sg.oscs) glide(os.frequency, f, o, d);
       });
       if (debug) console.log('[hum] chord →', chord, 'glide', dur.toFixed(1) + 's');
@@ -835,6 +838,39 @@
       scheduleStrings();
     }, 50000 + Math.random() * 80000);
   }
+  // Rhythm from pitch: now and then one to three upper layers pulse in volume at their own pitch
+  // slowed by whole octaves — 4–8 pulses to the bar (sometimes an octave slower, 2–4), where the bar
+  // is the breath. A major chord's 4:5:6 becomes 4 against 5 against 6, all meeting on the downbeat
+  // (the breath's peak). Each episode fades in over a bar, pulses 2–6 bars, fades out over a bar.
+  const BAR = 1 / PULSE_HZ;
+  function scheduleTremolo() {
+    later(() => {
+      if (!graph) return;
+      const pool = [...graph.choir, ...graph.upper, ...graph.strings.filter((sg) => sg.busy)].filter((v) => !v.pulsing);
+      const n = Math.min(pool.length, 1 + Math.floor(Math.random() * 3));
+      // next downbeat: the breath peaks a quarter-bar into each cycle
+      const now = actx.currentTime, beat0 = pulseT0 + BAR / 4;
+      const T = beat0 + Math.ceil((now + 0.5 - beat0) / BAR) * BAR;
+      const bars = 2 + Math.floor(Math.random() * 5), dur = (bars + 2) * BAR;
+      const picked = pool.sort(() => Math.random() - 0.5).slice(0, n);
+      const counts = [];
+      for (const v of picked) {
+        let c = v.f / ROOT; while (c < 4) c *= 2; while (c >= 8) c /= 2;    // the pitch, folded into 4–8 per bar
+        if (Math.random() < 0.3) c /= 2;                                  // sometimes half-time
+        const depth = 0.35 + Math.random() * 0.3, N = Math.ceil(dur * 30), curve = new Float32Array(N);
+        for (let i = 0; i < N; i++) {
+          const x = (i / (N - 1)) * dur / BAR;                             // position in bars
+          const env = Math.min(1, x, bars + 2 - x);                        // a bar in, a bar out
+          curve[i] = 1 - depth * env * (1 - Math.cos(TAU * c * x)) / 2;    // peaks on every beat, all meet on the downbeat
+        }
+        v.trem.gain.cancelScheduledValues(T); v.trem.gain.setValueCurveAtTime(curve, T, dur);
+        v.pulsing = true; later(() => { v.pulsing = false; }, (T - now + dur + 0.2) * 1000);
+        counts.push(c.toFixed(2));
+      }
+      if (debug) console.log('[hum] rhythm', counts.join(' : '), 'per bar ×', bars);
+      scheduleTremolo();
+    }, 25000 + Math.random() * 35000);
+  }
   function scheduleColour() {
     later(() => {
       if (!graph) return;
@@ -886,7 +922,7 @@
     unmute();
     actx.resume().catch(() => {});
     clearTimeout(tearDown);
-    if (!graph) { build(); scheduleDetune(); scheduleGlide(); scheduleColour(); scheduleBreath(); scheduleVibrato(); scheduleStrings(); }
+    if (!graph) { build(); scheduleDetune(); scheduleGlide(); scheduleColour(); scheduleBreath(); scheduleVibrato(); scheduleStrings(); scheduleTremolo(); }
     fadeIn(LEVEL, 10);
     if (debug) window.__hum = { ctx: actx, master: graph.master, graph };
   }
