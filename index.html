@@ -102,8 +102,8 @@
     opacity: 0.75;
     display: inline-flex; align-items: flex-start;
     min-width: 44px; min-height: 44px; line-height: 13px;
-    /* left pad balances the trailing tracking + the dot, so THE HUM stays centered */
-    padding: 0 0 31px calc(0.68em + 5px);
+    /* left pad balances the trailing tracking, so THE HUM stays centered */
+    padding: 0 0 31px 0.38em;
     cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
     transition: opacity 300ms ease;
   }
@@ -112,22 +112,19 @@
   .hum-toggle:focus-visible .hum-text {
     outline: 1px solid rgba(180,140,255,0.6); outline-offset: 5px; border-radius: 2px;
   }
-  .hum-dot {
-    flex: none; width: 5px; height: 5px; border-radius: 50%;
-    margin: 4px 0 0 0.3em;
-    background: rgba(143,135,176,0.3);
-    box-shadow: 0 0 0 0 rgba(180,140,255,0);
-    transition: background 2s ease, box-shadow 2s ease;
+  /* On: the words themselves hum — brighter, with a soft glow that swells and settles every 2 s. */
+  .hum-text { transition: color 2s ease, text-shadow 2s ease; }
+  .hum-toggle[aria-pressed="true"] { opacity: 0.95; }
+  .hum-toggle[aria-pressed="true"] .hum-text {
+    color: #cfc6ee;
+    animation: hum-pulse 2s ease-in-out 1.5s infinite;
   }
-  .hum-toggle[aria-pressed="true"] .hum-dot {
-    background: var(--ring);
-    box-shadow: 0 0 5px 0.5px rgba(180,140,255,0.5);
-    transition-duration: 4s;
-    animation: hum-breathe 11s ease-in-out 4s infinite;
+  @keyframes hum-pulse {
+    0%, 100% { color: #b9b0da; text-shadow: 0 0 4px rgba(180,140,255,0.15); }
+    50% { color: #ece6ff; text-shadow: 0 0 9px rgba(180,140,255,0.55); }
   }
-  @keyframes hum-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
   @media (prefers-reduced-motion: reduce) {
-    .hum-toggle[aria-pressed="true"] .hum-dot { animation: none; }
+    .hum-toggle[aria-pressed="true"] .hum-text { animation: none; }
   }
   .hum-hint {
     margin-top: -22px;
@@ -204,13 +201,14 @@
 </style>
 </head>
 <body>
+
 <div class="stage" aria-hidden="true">
   <canvas id="field"></canvas>
   <div class="void"></div>
 </div>
 
 <h1 class="head">
-  <button type="button" class="hum-toggle" id="hum" aria-pressed="false" aria-label="Turn the hum on"><span class="hum-text">The Hum</span><span class="hum-dot" aria-hidden="true"></span></button>
+  <button type="button" class="hum-toggle" id="hum" aria-pressed="false" aria-label="Turn the hum on"><span class="hum-text">The Hum</span></button>
   <span class="hum-hint" id="hum-hint" aria-hidden="true" hidden>tap to listen</span>
 </h1>
 
@@ -527,6 +525,14 @@
     const fl = ac.createOscillator(); fl.frequency.value = 1 / 40;
     const flg = ac.createGain(); flg.gain.value = 700;
     fl.connect(flg); flg.connect(filter.frequency); fl.start(now); sources.push(fl);
+    // Vibrato, idle until a bloom: a ~5–6 Hz sine into each pitch's detune, depth 0 at rest.
+    const vibrato = (targets) => {
+      const o = ac.createOscillator(); o.frequency.value = 5.5;
+      const depth = ac.createGain(); depth.gain.value = 0;
+      o.connect(depth); for (const p of targets) depth.connect(p);
+      o.start(now); sources.push(o);
+      return { rate: o.frequency, depth: depth.gain };
+    };
     // Soft partials; sines read as sub on small speakers.
     const pw = ac.createPeriodicWave(new Float32Array([0, 0, 0, 0, 0]), new Float32Array([0, 1, 0.16, 0.05, 0.015]));
     const swell = ac.createGain(); swell.gain.value = 1; swell.connect(filter);
@@ -538,7 +544,7 @@
       lfo.connect(lg); lg.connect(g.gain);
       osc.connect(g); g.connect(i === SWELL ? swell : filter);
       osc.start(now); lfo.start(now); sources.push(osc, lfo);
-      return { osc, g };
+      return { osc, g, vib: vibrato([osc.detune]), kind: 'main' };
     });
     const upper = UPPER.map((ratio, i) => {
       const osc = ac.createOscillator(); osc.type = 'sine'; osc.frequency.value = ROOT * snap(ratio, CHORDS[chord].tones, false);
@@ -549,7 +555,7 @@
       lfo.connect(lg); lg.connect(g.gain);
       osc.connect(g); g.connect(sp); sp.connect(filter);
       osc.start(now); lfo.start(now + Math.random() * UPPER_PERIODS[i]); sources.push(osc, lfo);
-      return { osc, r0: ratio };
+      return { osc, r0: ratio, vib: vibrato([osc.detune]), kind: 'upper' };
     });
     // A voice-like source: many harmonics rolling off ~1/n^1.7, like vocal folds rather than an organ pipe.
     const vh = new Float32Array(16); for (let n = 1; n < 16; n++) vh[n] = Math.pow(n, -1.7);
@@ -604,7 +610,7 @@
       air.connect(ahp); ahp.connect(am); am.connect(al); al.connect(g);
       air.start(now, Math.random() * 2); pulse.start(now); off.start(now); sources.push(air, pulse, off);
       lfo.start(now + Math.random() * CHOIR_PERIODS[i]); sources.push(lfo);
-      return { phrase, oscs, pulse, r0: ratio, f: ROOT * snap(ratio, CHORDS[chord].tones, false) };
+      return { phrase, oscs, pulse, vib: vibrato(oscs.map((o) => o.detune)), kind: 'choir', r0: ratio, f: ROOT * snap(ratio, CHORDS[chord].tones, false) };
     });
     // Colour: the harmonic 7th, below the fifth, mostly absent.
     const col = ac.createOscillator(); col.setPeriodicWave(pw); col.frequency.value = ROOT * 7 / 4;
@@ -622,13 +628,19 @@
   }
   function destroy() {
     for (const id of timers) clearTimeout(id);
-    timers = []; detuning = false;
+    timers = []; detuning = false; blooming = 0;
     for (const s of graph.sources) { try { s.stop(); } catch (e) {} }
     graph.master.disconnect();
     graph = null;
     actx.suspend().catch(() => {});
     if (silent) silent.pause();
   }
+  // Stop a param where it is right now — mid-ramp included — instead of snapping back to the
+  // ramp's start (what a bare cancelScheduledValues does).
+  const freeze = (p, t) => {
+    if (p.cancelAndHoldAtTime) p.cancelAndHoldAtTime(t);
+    else { const v = p.value; p.cancelScheduledValues(t); p.setValueAtTime(v, t); }
+  };
   const later = (fn, ms) => timers.push(setTimeout(fn, ms));
   const hold = (p, from, to, up, stay, down, t) => {   // ramp up, hold, ramp back
     p.cancelScheduledValues(t); p.setValueAtTime(from, t);
@@ -655,8 +667,11 @@
   function scheduleBreath() {
     later(() => {
       if (!graph) return;
-      const v = graph.choir[Math.floor(Math.random() * graph.choir.length)];
-      const t = actx.currentTime, gap = 0.9 + Math.random() * 0.9;
+      const t = actx.currentTime;
+      const still = graph.choir.filter((c) => !(c.until > t + 2));              // never breathe mid-glide
+      const v = still[Math.floor(Math.random() * still.length)];
+      if (!v) { scheduleBreath(); return; }
+      const gap = 0.9 + Math.random() * 0.9;
       v.phrase.gain.cancelScheduledValues(t); v.phrase.gain.setTargetAtTime(0, t, 0.22);
       const ig = graph.inhale.gain;
       ig.setTargetAtTime(0.0035, t + 0.45, 0.12); ig.setTargetAtTime(0, t + gap - 0.15, 0.1);
@@ -669,25 +684,64 @@
       scheduleBreath();
     }, 12000 + Math.random() * 18000);
   }
-  // The walk: hold a chord 25–55 s (dissonance 12–20 s), then glide every layer to the next over 6–9 s (the warp).
-  // Short enough that a one-minute visit hears it move.
+  // The walk: hold a chord for an uneven time (mostly mid-range, sometimes a quick turn, sometimes
+  // a long settle), then glide to the next at an uneven speed (3–20 s). Voices don't move in lockstep:
+  // each sets off a little early or late and takes its own time, so for a few seconds the chord is
+  // between chords — some voices arrived, others still sliding. That passing friction is the warp.
+  function holdFor(lo, hi) {
+    const x = Math.random();
+    if (x < 0.12) return lo * (0.45 + Math.random() * 0.3);          // a quick turn
+    if (x > 0.88) return hi * (1.2 + Math.random() * 0.6);           // a long settle
+    return lo + (hi - lo) * (Math.random() + Math.random()) / 2;     // mostly the middle
+  }
   function scheduleGlide() {
     const [lo, hi] = CHORDS[chord].hold;
     later(() => {
       if (!graph) return;
       chord = pickNext(chord);
-      const tones = CHORDS[chord].tones, t = actx.currentTime, dur = 6 + Math.random() * 3;
-      const glide = (p, hz) => { p.cancelScheduledValues(t); p.setValueAtTime(p.value, t); p.exponentialRampToValueAtTime(hz, t + dur); };
-      graph.voices.forEach((v, i) => glide(v.osc.frequency, ROOT * snap(MAIN_R0[i], tones, i === 0)));
-      graph.upper.forEach((u) => glide(u.osc.frequency, ROOT * snap(u.r0, tones, false)));
+      const tones = CHORDS[chord].tones, t = actx.currentTime;
+      const dur = 3 + 17 * Math.pow(Math.random(), 0.75);               // 3–20 s, leaning slow
+      const spread = Math.min(4, dur * 0.35);
+      const glide = (p, hz, off, d) => {
+        freeze(p, t); p.setValueAtTime(p.value, t + off); p.exponentialRampToValueAtTime(hz, t + off + d);
+      };
+      const own = () => [Math.random() * spread, dur * (0.7 + Math.random() * 0.6)];
+      graph.voices.forEach((v, i) => { const [o, d] = own(); glide(v.osc.frequency, ROOT * snap(MAIN_R0[i], tones, i === 0), o, d); });
+      graph.upper.forEach((u) => { const [o, d] = own(); glide(u.osc.frequency, ROOT * snap(u.r0, tones, false), o, d); });
       graph.choir.forEach((c) => {
-        c.f = ROOT * snap(c.r0, tones, false);
-        for (const o of c.oscs) glide(o.frequency, c.f);
-        glide(c.pulse.frequency, c.f);
+        const [o, d] = own();                                            // one person: their singers move together
+        c.f = ROOT * snap(c.r0, tones, false); c.until = t + o + d + 0.3;
+        for (const os of c.oscs) glide(os.frequency, c.f, o + Math.random() * 0.3, d);
+        glide(c.pulse.frequency, c.f, o, d);
       });
-      if (debug) console.log('[hum] chord →', chord);
+      if (debug) console.log('[hum] chord →', chord, 'glide', dur.toFixed(1) + 's');
       scheduleGlide();
-    }, (lo + Math.random() * (hi - lo)) * 1000);
+    }, holdFor(lo, hi) * 1000);
+  }
+  // Blooms: now and then one tone leans in — vibrato swells up, holds, and lets go. Mostly the
+  // humming voices, wider and quicker; sometimes a synth voice, slower and narrower. At most two at once.
+  let blooming = 0;
+  function scheduleVibrato() {
+    later(() => {
+      if (!graph) return;
+      if (blooming < 2) {
+        const pool = [...graph.choir, ...graph.choir, ...graph.voices.slice(1), ...graph.upper].filter((v) => !v.blooming);
+        const v = pool[Math.floor(Math.random() * pool.length)];
+        if (v) {
+          const t = actx.currentTime, choir = v.kind === 'choir';
+          const cents = choir ? 12 + Math.random() * 23 : 6 + Math.random() * 12;
+          const rate = choir ? 4.8 + Math.random() * 1.6 : 4 + Math.random() * 1.5;
+          const up = 1.5 + Math.random() * 3, stay = 2 + Math.random() * 7, down = 2 + Math.random() * 4;
+          v.vib.rate.cancelScheduledValues(t); v.vib.rate.setValueAtTime(rate * 0.85, t);
+          v.vib.rate.linearRampToValueAtTime(rate, t + up);                    // quickens as it opens
+          hold(v.vib.depth, 0, cents, up, stay, down, t);
+          v.blooming = true; blooming++;
+          later(() => { v.blooming = false; blooming--; }, (up + stay + down) * 1000);
+          if (debug) console.log('[hum] bloom', v.kind, cents.toFixed(0) + '¢', rate.toFixed(1) + 'Hz');
+        }
+      }
+      scheduleVibrato();
+    }, 6000 + Math.random() * 16000);
   }
   function scheduleColour() {
     later(() => {
@@ -734,7 +788,7 @@
     unmute();
     actx.resume().catch(() => {});
     clearTimeout(tearDown);
-    if (!graph) { build(); scheduleDetune(); scheduleGlide(); scheduleColour(); scheduleBreath(); }
+    if (!graph) { build(); scheduleDetune(); scheduleGlide(); scheduleColour(); scheduleBreath(); scheduleVibrato(); }
     ramp(LEVEL, 4);
     if (debug) window.__hum = { ctx: actx, master: graph.master, graph };
   }

@@ -18,7 +18,9 @@ tone, Earth's orbit raised 32 octaves (136.10 Hz; root an octave down at
 68.05 Hz, C♯), in just ratios: a synth floor, upper harmony and a humming
 choir. The chord walks slowly between neighbours on the same root (open fifth,
 major, sus, minor, sevenths, neutral third; brief clusters that always
-resolve) and follows the ring: it leans toward the bright side and swells
-with hot spots. Debug hook only with #humdebug.
+resolve) on uneven timing: holds and glide speeds vary, and each voice
+glides on its own clock. Now and then one tone blooms into vibrato. It
+follows the ring: it leans toward the bright side and swells with hot spots.
+While it plays, the title pulses. Debug hook only with #humdebug.
 
 When thehum.studio is live, add a quiet link beside thehum.works in the footer.
