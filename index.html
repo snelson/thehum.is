@@ -85,14 +85,59 @@
   }
   /* The name frames the page from the top edge, as the link does from the bottom. */
   .head {
-    position: absolute; left: 0; right: 0; top: 0; z-index: 1; margin: 0;
+    position: absolute; left: 0; right: 0; top: 0; z-index: 2; margin: 0; /* above the verse flow, so the switch takes the tap */
     padding-top: calc(var(--footer-gap) + 14px + env(safe-area-inset-top, 0px));
-    text-align: center;
+    display: flex; flex-direction: column; align-items: center;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     font-weight: 500; font-size: var(--inscription-size);
-    letter-spacing: 0.38em; padding-left: 0.38em; text-transform: uppercase; /* padding balances the trailing tracking */
-    color: var(--ink-dim); opacity: 0.75;
+    letter-spacing: 0.38em; text-transform: uppercase;
+    color: var(--ink-dim);
   }
+  /* The name is also the switch. Same look as before; the tap target grows
+     downward into the dark so the text doesn't move. */
+  .hum-toggle {
+    appearance: none; -webkit-appearance: none;
+    background: none; border: 0; margin: 0; box-sizing: border-box;
+    font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit;
+    opacity: 0.75;
+    display: inline-flex; align-items: flex-start;
+    min-width: 44px; min-height: 44px; line-height: 13px;
+    /* left pad balances the trailing tracking + the dot, so THE HUM stays centered */
+    padding: 0 0 31px calc(0.68em + 5px);
+    cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    transition: opacity 300ms ease;
+  }
+  .hum-toggle:hover { opacity: 0.95; }
+  .hum-toggle:focus { outline: none; }
+  .hum-toggle:focus-visible .hum-text {
+    outline: 1px solid rgba(180,140,255,0.6); outline-offset: 5px; border-radius: 2px;
+  }
+  .hum-dot {
+    flex: none; width: 5px; height: 5px; border-radius: 50%;
+    margin: 4px 0 0 0.3em;
+    background: rgba(143,135,176,0.3);
+    box-shadow: 0 0 0 0 rgba(180,140,255,0);
+    transition: background 2s ease, box-shadow 2s ease;
+  }
+  .hum-toggle[aria-pressed="true"] .hum-dot {
+    background: var(--ring);
+    box-shadow: 0 0 5px 0.5px rgba(180,140,255,0.5);
+    transition-duration: 4s;
+    animation: hum-breathe 11s ease-in-out 4s infinite;
+  }
+  @keyframes hum-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+  @media (prefers-reduced-motion: reduce) {
+    .hum-toggle[aria-pressed="true"] .hum-dot { animation: none; }
+  }
+  .hum-hint {
+    margin-top: -22px;
+    font-family: "Newsreader", Georgia, serif; font-style: italic; font-weight: 300;
+    font-size: 11px; letter-spacing: 0.02em; text-transform: none;
+    color: var(--ink-dim); opacity: 0.45;
+    pointer-events: none;
+    transition: opacity 1.6s ease;
+  }
+  .hum-hint.fade { opacity: 0; }
 
   /* Verse sits in flow so a short viewport scrolls instead of clipping.
      Symmetric padding keeps it on the viewport center when it fits; the
@@ -164,7 +209,10 @@
   <div class="void"></div>
 </div>
 
-<h1 class="head">The Hum</h1>
+<h1 class="head">
+  <button type="button" class="hum-toggle" id="hum" aria-pressed="false" aria-label="Turn the hum on"><span class="hum-text">The Hum</span><span class="hum-dot" aria-hidden="true"></span></button>
+  <span class="hum-hint" id="hum-hint" aria-hidden="true" hidden>tap to listen</span>
+</h1>
 
 <main class="verse-wrap">
   <div class="verse">
@@ -291,6 +339,7 @@
   // Accretion light is clumpy: brightness churns along the ring (three drifting waves at
   // incommensurate speeds) and hot spots flare, orbit and fade. Beaming still favours one side.
   const spots = [];
+  const vis = { phi: 0, hot: 0 };   // ring state shared with the sound, written once per frame in drawRing
   function newSpot(t) {
     return { th: Math.random() * TAU, w: spin * (0.12 + Math.random() * 0.25), born: t,
              life: 4 + Math.random() * 7, sig: 0.09 + Math.random() * 0.1, peak: 0.35 + Math.random() * 0.35 };
@@ -319,6 +368,9 @@
       for (let i = 0; i < spots.length; i++) if (t - spots[i].born > spots[i].life) spots[i] = newSpot(t);
     }
     const phi = ((now || 0) / BEAM_PERIOD) * TAU * spin;
+    // What the sound is allowed to know: where the bright side is, how hot the spots are.
+    vis.phi = phi; vis.hot = 0;
+    for (const sp of spots) vis.hot += sp.peak * Math.sin(Math.PI * Math.min(1, Math.max(0, (t - sp.born) / sp.life)));
     const bs = [];
     for (let i = 0; i < STOPS; i++) bs.push(brightness((i / STOPS) * TAU, t, phi));
     ctx.save();
@@ -368,6 +420,7 @@
     step(dt);
     drawPoints();
     drawRing(1, now - t0);
+    humTick(now);
     raf = requestAnimationFrame(frame);
   }
   function start() { if (!raf) { last = performance.now(); raf = requestAnimationFrame(frame); } }
@@ -384,6 +437,332 @@
     document.addEventListener('visibilitychange', () => document.hidden ? stop() : start());
     start();
   }
+
+  // ---- The hum --------------------------------------------------------------
+  // A chord on the year tone (C♯) in just ratios off the harmonic series, each voice breathing on
+  // its own period so the texture never quite repeats. Room tone, not music.
+  // Off until asked; everything is built inside the tap, which is what phones require.
+  const ROOT = 68.05;   // C♯2: the Earth year (1 / 365.2422 days) raised 32 octaves → 136.10 Hz, here one octave down
+  // The chord travels the verse: from sameness (an open fifth) through harmony to the edge of noise
+  // (a cluster), on the same root. A slow random walk between neighbours; dissonance is a short
+  // visit that always resolves. Tones are just ratios within one octave.
+  const CHORDS = {
+    open:    { tones: [1, 3/2],               hold: [35, 55],  next: { major: 5, sus2: 2.5, sus4: 2.5 } },
+    major:   { tones: [1, 5/4, 3/2],          hold: [35, 55],  next: { open: 2, sus2: 2, sus4: 2, dom7: 2.5, minor: 1.5 } },
+    sus2:    { tones: [1, 9/8, 3/2],          hold: [25, 45],   next: { major: 4, minor: 3.5, open: 2.5 } },
+    sus4:    { tones: [1, 4/3, 3/2],          hold: [25, 45],   next: { major: 4.5, dom7: 3, cluster: 1.5 } },
+    minor:   { tones: [1, 6/5, 3/2],          hold: [25, 45],  next: { min7: 3.5, sus2: 2.5, neutral: 2.5, cluster: 1.5 } },
+    min7:    { tones: [1, 6/5, 3/2, 9/5],     hold: [25, 45],   next: { minor: 5, tritone: 2, sus4: 3 } },
+    dom7:    { tones: [1, 5/4, 3/2, 7/4],     hold: [25, 45],   next: { major: 5.5, tritone: 2, sus4: 2.5 } },
+    neutral: { tones: [1, 11/9, 3/2],         hold: [25, 40],   next: { minor: 4, major: 4, open: 2 } },
+    cluster: { tones: [1, 16/15, 3/2],        hold: [12, 20],   next: { sus2: 5, minor: 5 } },        // the edge of noise
+    tritone: { tones: [1, 45/32, 7/4],        hold: [12, 20],   next: { dom7: 4, sus4: 3, major: 3 } },
+  };
+  // Each voice keeps its register and takes the nearest chord tone there, so movement is by small steps.
+  const snap = (r0, tones, isRoot) => {
+    if (isRoot) return r0;
+    let best = r0, bd = Infinity;
+    for (const tn of tones) for (let k = -1; k <= 4; k++) {
+      const c = tn * Math.pow(2, k), d = Math.abs(Math.log2(c / r0));
+      if (d < bd) { bd = d; best = c; }
+    }
+    return best;
+  };
+  const pickNext = (name) => {
+    const opts = Object.entries(CHORDS[name].next), total = opts.reduce((a, [, w]) => a + w, 0);
+    let x = Math.random() * total;
+    for (const [n, w] of opts) { x -= w; if (x <= 0) return n; }
+    return opts[0][0];
+  };
+  const MAIN_R0 = [1, 3/2, 2, 5/2, 7/2];   // the top voice sits where a 7th can land
+  const LFO_PERIODS = [13, 17, 19, 23, 29];
+  const VOICE_GAIN = [0.07, 0.08, 0.07, 0.062, 0.055];                  // the root is felt more than heard
+  // Upper harmony: the series one and two octaves up (×4 … ×12), pure sines that drift in
+  // and out on long incommensurate cycles and sit slightly apart in the stereo field.
+  const UPPER = [4, 5, 6, 8], UPPER_PERIODS = [31, 37, 41, 43];
+  const UPPER_GAIN = [0.024, 0.021, 0.018, 0.012], UPPER_PAN = [-0.45, 0.35, -0.2, 0.5];
+  // Choir, humming: low alto to mezzo (×3 … ×7, ~200–480 Hz). A hum is mostly fundamental,
+  // muffled through the nose (a dip in the upper mids). Each voice is a few singers who drift a
+  // little, breathe on their own schedule, and scoop up into the note when they come back in.
+  const CHOIR = [3, 4, 5, 6, 7], CHOIR_PERIODS = [53, 59, 61, 67, 71];
+  const CHOIR_GAIN = [0.018, 0.017, 0.016, 0.014, 0.011], CHOIR_PAN = [0.3, -0.35, 0.45, -0.4, 0.15];
+
+  const SWELL = 4, LEVEL = 0.55;                                         // which voice the hot spots lean on; master ceiling
+  const btn = document.getElementById('hum'), hint = document.getElementById('hum-hint');
+  const debug = location.hash === '#humdebug';
+  let actx = null, graph = null, on = false, timers = [], tearDown = 0, hideTimer = 0, silent = null;
+  let lastTick = 0, chord = 'major', detuning = false;
+
+  const heard = () => { try { return !!localStorage.getItem('hum.heard'); } catch (e) { return false; } };
+  const remember = () => { try { localStorage.setItem('hum.heard', '1'); } catch (e) {} };
+  if (!heard()) hint.hidden = false;
+
+  function impulse(ac, secs) {   // a room, synthesized: decaying noise, ~5 s
+    const n = Math.round(ac.sampleRate * secs), buf = ac.createBuffer(2, n, ac.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const d = buf.getChannelData(c);
+      for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-6 * i / n) * Math.min(1, i / 400);
+    }
+    return buf;
+  }
+  function noiseBuf(ac) {
+    const n = ac.sampleRate * 2, buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    return buf;
+  }
+
+  function build() {
+    const ac = actx, now = ac.currentTime, sources = [];
+    const master = ac.createGain(); master.gain.value = 0;
+    const filter = ac.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 1700; filter.Q.value = 0.5;
+    const pan = ac.createStereoPanner();
+    const dry = ac.createGain(); dry.gain.value = 0.8;
+    const conv = ac.createConvolver(); conv.buffer = impulse(ac, 5);
+    const wet = ac.createGain(); wet.gain.value = 0.4;
+    // Pull the low end back: a gentle shelf, so the bass is a floor, not the room.
+    const shelf = ac.createBiquadFilter(); shelf.type = 'lowshelf'; shelf.frequency.value = 150; shelf.gain.value = -6;
+    filter.connect(shelf); shelf.connect(pan); pan.connect(dry); pan.connect(conv); conv.connect(wet);
+    dry.connect(master); wet.connect(master); master.connect(ac.destination);
+    // Air: the lowpass wanders 1000–2400 Hz over ~40 s, open enough for the upper voices.
+    const fl = ac.createOscillator(); fl.frequency.value = 1 / 40;
+    const flg = ac.createGain(); flg.gain.value = 700;
+    fl.connect(flg); flg.connect(filter.frequency); fl.start(now); sources.push(fl);
+    // Soft partials; sines read as sub on small speakers.
+    const pw = ac.createPeriodicWave(new Float32Array([0, 0, 0, 0, 0]), new Float32Array([0, 1, 0.16, 0.05, 0.015]));
+    const swell = ac.createGain(); swell.gain.value = 1; swell.connect(filter);
+    const voices = MAIN_R0.map((r0, i) => {
+      const osc = ac.createOscillator(); osc.setPeriodicWave(pw); osc.frequency.value = ROOT * snap(r0, CHORDS[chord].tones, i === 0);
+      const g = ac.createGain(); g.gain.value = VOICE_GAIN[i] * 0.65;
+      const lfo = ac.createOscillator(); lfo.frequency.value = 1 / LFO_PERIODS[i];
+      const lg = ac.createGain(); lg.gain.value = VOICE_GAIN[i] * 0.35;
+      lfo.connect(lg); lg.connect(g.gain);
+      osc.connect(g); g.connect(i === SWELL ? swell : filter);
+      osc.start(now); lfo.start(now); sources.push(osc, lfo);
+      return { osc, g };
+    });
+    const upper = UPPER.map((ratio, i) => {
+      const osc = ac.createOscillator(); osc.type = 'sine'; osc.frequency.value = ROOT * snap(ratio, CHORDS[chord].tones, false);
+      const g = ac.createGain(); g.gain.value = UPPER_GAIN[i] * 0.8;   // swells 60–100%: the drone holds
+      const lfo = ac.createOscillator(); lfo.frequency.value = 1 / UPPER_PERIODS[i];
+      const lg = ac.createGain(); lg.gain.value = UPPER_GAIN[i] * 0.2;
+      const sp = ac.createStereoPanner(); sp.pan.value = UPPER_PAN[i];
+      lfo.connect(lg); lg.connect(g.gain);
+      osc.connect(g); g.connect(sp); sp.connect(filter);
+      osc.start(now); lfo.start(now + Math.random() * UPPER_PERIODS[i]); sources.push(osc, lfo);
+      return { osc, r0: ratio };
+    });
+    // A voice-like source: many harmonics rolling off ~1/n^1.7, like vocal folds rather than an organ pipe.
+    const vh = new Float32Array(16); for (let n = 1; n < 16; n++) vh[n] = Math.pow(n, -1.7);
+    const vox = ac.createPeriodicWave(new Float32Array(16), vh);
+    const nzb = noiseBuf(ac);
+    // Human irregularity: slow-ish random noise (lowpassed to a few Hz) wobbling pitch and level.
+    const wobble = (dest, scale, hz) => {
+      const n = ac.createBufferSource(); n.buffer = nzb; n.loop = true;
+      const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = hz; lp.Q.value = 0.5;
+      const k = ac.createGain(); k.gain.value = scale;
+      n.connect(lp); lp.connect(k); k.connect(dest); n.start(now, Math.random() * 2); sources.push(n);
+    };
+    // The nose: a dip around 1.1 kHz and a soft lowpass; lips closed.
+    const nasal = ac.createBiquadFilter(); nasal.type = 'peaking'; nasal.frequency.value = 1100; nasal.Q.value = 1.4; nasal.gain.value = -14;
+    const lips = ac.createBiquadFilter(); lips.type = 'lowpass'; lips.frequency.value = 1300; lips.Q.value = 0.4;
+    nasal.connect(lips); lips.connect(filter);
+    // Inhales: a whisper of filtered noise, bumped when a voice breathes.
+    const inz = ac.createBufferSource(); inz.buffer = noiseBuf(ac); inz.loop = true;
+    const ibp = ac.createBiquadFilter(); ibp.type = 'bandpass'; ibp.frequency.value = 1800; ibp.Q.value = 0.7;
+    const inhale = ac.createGain(); inhale.gain.value = 0;
+    inz.connect(ibp); ibp.connect(inhale); inhale.connect(filter); inz.start(now); sources.push(inz);
+    const choir = CHOIR.map((ratio, i) => {
+      const g = ac.createGain(); g.gain.value = CHOIR_GAIN[i] * 0.8;   // swells 60–100%: present, not coming and going
+      const lfo = ac.createOscillator(); lfo.frequency.value = 1 / CHOIR_PERIODS[i];
+      const lg = ac.createGain(); lg.gain.value = CHOIR_GAIN[i] * 0.2;
+      const phrase = ac.createGain(); phrase.gain.value = 1;                                 // breath gaps
+      const sp = ac.createStereoPanner(); sp.pan.value = CHOIR_PAN[i];
+      lfo.connect(lg); lg.connect(g.gain); g.connect(phrase); phrase.connect(sp); sp.connect(nasal);
+      const oscs = [];
+      for (const cents of [-6, 0, 5]) {                                                      // a few singers on one note
+        const osc = ac.createOscillator(); osc.setPeriodicWave(vox);
+        osc.frequency.value = ROOT * snap(ratio, CHORDS[chord].tones, false); osc.detune.value = cents;
+        // Drift, not vibrato: two slow, uneven wanders of a few cents per singer.
+        for (const [hz, depth] of [[0.07 + Math.random() * 0.08, 3], [0.17 + Math.random() * 0.1, 2]]) {
+          const w = ac.createOscillator(); w.frequency.value = hz;
+          const wd = ac.createGain(); wd.gain.value = depth;
+          w.connect(wd); wd.connect(osc.detune); w.start(now + Math.random() * 10); sources.push(w);
+        }
+        wobble(osc.detune, 300, 6 + Math.random() * 4);                                     // jitter: ~4¢ RMS (lowpassed noise is ~0.0135 RMS)
+        const sg = ac.createGain(); sg.gain.value = 1; wobble(sg.gain, 2.2, 4 + Math.random() * 3);   // shimmer: ~3% of level
+        osc.connect(sg); sg.connect(g); osc.start(now); sources.push(osc); oscs.push(osc);
+      }
+      // Breath in the tone: air through the folds, pulsing at the voice's own pitch.
+      const air = ac.createBufferSource(); air.buffer = nzb; air.loop = true;
+      const ahp = ac.createBiquadFilter(); ahp.type = 'highpass'; ahp.frequency.value = 700;
+      const am = ac.createGain(); am.gain.value = 0;
+      const pulse = ac.createOscillator(); pulse.frequency.value = ROOT * snap(ratio, CHORDS[chord].tones, false);
+      const pd = ac.createGain(); pd.gain.value = 0.5;
+      const off = ac.createConstantSource(); off.offset.value = 0.5;
+      pulse.connect(pd); pd.connect(am.gain); off.connect(am.gain);
+      const al = ac.createGain(); al.gain.value = 0.35;
+      air.connect(ahp); ahp.connect(am); am.connect(al); al.connect(g);
+      air.start(now, Math.random() * 2); pulse.start(now); off.start(now); sources.push(air, pulse, off);
+      lfo.start(now + Math.random() * CHOIR_PERIODS[i]); sources.push(lfo);
+      return { phrase, oscs, pulse, r0: ratio, f: ROOT * snap(ratio, CHORDS[chord].tones, false) };
+    });
+    // Colour: the harmonic 7th, below the fifth, mostly absent.
+    const col = ac.createOscillator(); col.setPeriodicWave(pw); col.frequency.value = ROOT * 7 / 4;
+    const colour = ac.createGain(); colour.gain.value = 0;
+    col.connect(colour); colour.connect(filter); col.start(now); sources.push(col);
+    // Breath: filtered noise, nearly subliminal.
+    const nz = ac.createBufferSource(); nz.buffer = noiseBuf(ac); nz.loop = true;
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 500; bp.Q.value = 0.8;
+    const breath = ac.createGain(); breath.gain.value = 0.006;
+    const bl = ac.createOscillator(); bl.frequency.value = 1 / 11;
+    const blg = ac.createGain(); blg.gain.value = 0.004;
+    bl.connect(blg); blg.connect(breath.gain);
+    nz.connect(bp); bp.connect(breath); breath.connect(filter); nz.start(now); bl.start(now); sources.push(nz, bl);
+    graph = { master, filter, pan, swell, voices, upper, colour, sources, choir, inhale };
+  }
+  function destroy() {
+    for (const id of timers) clearTimeout(id);
+    timers = []; detuning = false;
+    for (const s of graph.sources) { try { s.stop(); } catch (e) {} }
+    graph.master.disconnect();
+    graph = null;
+    actx.suspend().catch(() => {});
+    if (silent) silent.pause();
+  }
+  const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+  const hold = (p, from, to, up, stay, down, t) => {   // ramp up, hold, ramp back
+    p.cancelScheduledValues(t); p.setValueAtTime(from, t);
+    p.linearRampToValueAtTime(to, t + up); p.setValueAtTime(to, t + up + stay); p.linearRampToValueAtTime(from, t + up + stay + down);
+  };
+
+  // Tension held: one voice drifts a few cents off pure, beats, then comes home. Never two at once.
+  function scheduleDetune() {
+    later(() => {
+      if (!graph) return;
+      if (!detuning) {
+        detuning = true;
+        const v = graph.voices[1 + Math.floor(Math.random() * 4)];
+        const cents = (3 + Math.random() * 6) * (Math.random() < 0.5 ? -1 : 1), stay = 6 + Math.random() * 6;
+        hold(v.osc.detune, 0, cents, 4, stay, 4, actx.currentTime);
+        later(() => { detuning = false; }, (stay + 8.5) * 1000);
+      }
+      scheduleDetune();
+    }, 20000 + Math.random() * 20000);
+  }
+  // Shifting: the chord slides to a neighbouring voicing along the series. The root stays.
+  // Breathing, rarely: every 12–30 s one humming voice, chosen at random, lets go, breathes and
+  // scoops back in. The rest keep droning. Variance, not a pattern.
+  function scheduleBreath() {
+    later(() => {
+      if (!graph) return;
+      const v = graph.choir[Math.floor(Math.random() * graph.choir.length)];
+      const t = actx.currentTime, gap = 0.9 + Math.random() * 0.9;
+      v.phrase.gain.cancelScheduledValues(t); v.phrase.gain.setTargetAtTime(0, t, 0.22);
+      const ig = graph.inhale.gain;
+      ig.setTargetAtTime(0.0035, t + 0.45, 0.12); ig.setTargetAtTime(0, t + gap - 0.15, 0.1);
+      v.phrase.gain.setTargetAtTime(1, t + gap, 0.16);
+      for (const o of v.oscs) {
+        o.frequency.cancelScheduledValues(t + gap);
+        o.frequency.setValueAtTime(v.f * Math.pow(2, -28 / 1200), t + gap);   // ~28¢ flat
+        o.frequency.setTargetAtTime(v.f, t + gap, 0.11);
+      }
+      scheduleBreath();
+    }, 12000 + Math.random() * 18000);
+  }
+  // The walk: hold a chord 25–55 s (dissonance 12–20 s), then glide every layer to the next over 6–9 s (the warp).
+  // Short enough that a one-minute visit hears it move.
+  function scheduleGlide() {
+    const [lo, hi] = CHORDS[chord].hold;
+    later(() => {
+      if (!graph) return;
+      chord = pickNext(chord);
+      const tones = CHORDS[chord].tones, t = actx.currentTime, dur = 6 + Math.random() * 3;
+      const glide = (p, hz) => { p.cancelScheduledValues(t); p.setValueAtTime(p.value, t); p.exponentialRampToValueAtTime(hz, t + dur); };
+      graph.voices.forEach((v, i) => glide(v.osc.frequency, ROOT * snap(MAIN_R0[i], tones, i === 0)));
+      graph.upper.forEach((u) => glide(u.osc.frequency, ROOT * snap(u.r0, tones, false)));
+      graph.choir.forEach((c) => {
+        c.f = ROOT * snap(c.r0, tones, false);
+        for (const o of c.oscs) glide(o.frequency, c.f);
+        glide(c.pulse.frequency, c.f);
+      });
+      if (debug) console.log('[hum] chord →', chord);
+      scheduleGlide();
+    }, (lo + Math.random() * (hi - lo)) * 1000);
+  }
+  function scheduleColour() {
+    later(() => {
+      if (!graph) return;
+      hold(graph.colour.gain, 0, 0.03, 6, 8 + Math.random() * 8, 6, actx.currentTime);
+      scheduleColour();
+    }, 45000 + Math.random() * 45000);
+  }
+  // Once per frame from the ring loop, throttled: the sound leans toward the bright
+  // side, and one voice swells with the hot spots.
+  function humTick(now) {
+    if (!graph || now - lastTick < 100) return;
+    lastTick = now;
+    const t = actx.currentTime;
+    graph.pan.pan.setTargetAtTime(0.3 * Math.cos(vis.phi), t, 0.5);
+    graph.swell.gain.setTargetAtTime(1 + 0.9 * Math.min(1, vis.hot), t, 0.7);
+  }
+  function ramp(to, secs) {
+    const g = graph.master.gain, t = actx.currentTime;
+    g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(to, t + secs);
+  }
+
+  // iOS: claim the playback channel and keep a silent track looping, or the mute switch wins.
+  function unmute() {
+    try {
+      if (navigator.audioSession) navigator.audioSession.type = 'playback';
+      if (!silent) {
+        const n = 4000, b = new Uint8Array(44 + n), v = new DataView(b.buffer);
+        const tag = (o, s) => { for (let i = 0; i < 4; i++) b[o + i] = s.charCodeAt(i); };
+        tag(0, 'RIFF'); v.setUint32(4, 36 + n, true); tag(8, 'WAVE'); tag(12, 'fmt ');
+        v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+        v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+        tag(36, 'data'); v.setUint32(40, n, true); b.fill(128, 44);
+        let s = ''; for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+        silent = new Audio('data:audio/wav;base64,' + btoa(s));
+        silent.loop = true; silent.setAttribute('playsinline', '');
+      }
+      silent.play().catch(() => {});
+    } catch (e) {}
+  }
+
+  function enable() {
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    unmute();
+    actx.resume().catch(() => {});
+    clearTimeout(tearDown);
+    if (!graph) { build(); scheduleDetune(); scheduleGlide(); scheduleColour(); scheduleBreath(); }
+    ramp(LEVEL, 4);
+    if (debug) window.__hum = { ctx: actx, master: graph.master, graph };
+  }
+  function disable() {
+    if (!graph) return;
+    ramp(0, 2);
+    tearDown = setTimeout(() => { if (!on && graph) destroy(); }, 2400);
+  }
+
+  btn.addEventListener('click', () => {
+    on = !on;
+    btn.setAttribute('aria-pressed', String(on));
+    btn.setAttribute('aria-label', on ? 'Turn the hum off' : 'Turn the hum on');
+    if (on) {
+      enable();
+      if (!hint.hidden) { remember(); hint.classList.add('fade'); setTimeout(() => { hint.hidden = true; }, 1700); }
+    } else disable();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!graph || !on) return;
+    clearTimeout(hideTimer);
+    if (document.hidden) {
+      ramp(0, 0.3);
+      hideTimer = setTimeout(() => { if (document.hidden && graph) actx.suspend().catch(() => {}); }, 400);
+    } else {
+      actx.resume().then(() => { if (graph && on) ramp(LEVEL, 1.5); }).catch(() => {});
+    }
+  });
 })();
 </script>
 </body>
