@@ -894,17 +894,17 @@
       scheduleTremolo();
     }, 25000 + Math.random() * 35000);
   }
-  // Leaving home: every 3–6 min the whole hum glides (15–30 s, eased) to a near key in just
-  // intonation — a whole tone either way, a minor third up, a major third or a fourth down —
-  // stays 1–2.5 min, then glides home to the year tone. Chords, pulses and rhythms ride along.
-  const KEYS = [-498, -386, -204, 204, 316];
+  // Leaning off home: every 3–6 min the whole hum swells (25–45 s, eased) a just half step
+  // (16/15) or whole step (9/8) up or down — half steps twice as likely — stays 1–2.5 min, then
+  // eases home to the year tone. Barely a key change; more a lean. Chords and rhythms ride along.
+  const KEYS = [-112, -112, 112, 112, -204, 204];
   let away = false;
   function scheduleKey(first) {
     later(() => {
       if (!graph) return;
       const p = graph.key.offset, t = actx.currentTime, from = p.value;
       const to = away ? 0 : KEYS[Math.floor(Math.random() * KEYS.length)];
-      const dur = 15 + Math.random() * 15, curve = new Float32Array(96);
+      const dur = 25 + Math.random() * 20, curve = new Float32Array(96);
       for (let i = 0; i < 96; i++) { const x = i / 95; curve[i] = from + (to - from) * x * x * (3 - 2 * x); }
       p.cancelScheduledValues(t); p.setValueCurveAtTime(curve, t, dur);
       away = !away;
