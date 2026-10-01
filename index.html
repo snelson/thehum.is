@@ -338,7 +338,23 @@
   // Accretion light is clumpy: brightness churns along the ring (three drifting waves at
   // incommensurate speeds) and hot spots flare, orbit and fade. Beaming still favours one side.
   const spots = [];
-  const vis = { phi: 0, hot: 0 };   // ring state shared with the sound, written once per frame in drawRing
+  const vis = { phi: 0, hot: 0, near: 0 };   // ring state shared with the sound, written once per frame in drawRing
+  // The visitor's hand: a small mass. Where it nears the horizon the ring brightens beneath it, and
+  // the sound opens. Eased in and out, so it follows rather than snaps; settles ~3 s after stillness.
+  const ptr = { x: 0, y: 0, at: -1e9 }, touch = { cx: 1, cy: 0, s: 0 };
+  const feel = (e) => { ptr.x = e.clientX; ptr.y = e.clientY; ptr.at = performance.now(); };
+  addEventListener('pointermove', feel, { passive: true });
+  addEventListener('pointerdown', feel, { passive: true });
+  function sense() {
+    const idle = (performance.now() - ptr.at) / 1000;
+    const act = idle < 0.6 ? 1 : Math.exp(-(idle - 0.6) / 0.9);
+    const dx = ptr.x - cx, dy = ptr.y - cy, dist = Math.hypot(dx, dy) || 1;
+    const close = Math.exp(-Math.abs(dist - r) / 140);
+    const target = act * close, k = target > touch.s ? 0.06 : 0.025;
+    touch.s += (target - touch.s) * k;
+    touch.cx += (dx / dist - touch.cx) * 0.08; touch.cy += (dy / dist - touch.cy) * 0.08;
+    touch.th = Math.atan2(touch.cy, touch.cx);
+  }
   function newSpot(t) {
     return { th: Math.random() * TAU, w: spin * (0.12 + Math.random() * 0.25), born: t,
              life: 4 + Math.random() * 7, sig: 0.09 + Math.random() * 0.1, peak: 0.35 + Math.random() * 0.35 };
@@ -352,7 +368,9 @@
       let d = Math.abs(((th - (sp.th + sp.w * age)) % TAU + TAU) % TAU); d = Math.min(d, TAU - d);
       hot += sp.peak * env * Math.exp(-(d * d) / (2 * sp.sig * sp.sig));
     }
-    return Math.min(1, 0.12 + 0.88 * beam * (0.35 + 0.65 * turb) + hot * (0.4 + 0.6 * beam));
+    let hand = 0;
+    if (touch.s > 0.005) { let d = Math.abs(((th - touch.th) % TAU + TAU) % TAU); d = Math.min(d, TAU - d); hand = touch.s * Math.exp(-(d * d) / (2 * 0.16 * 0.16)); }
+    return Math.min(1, 0.12 + 0.88 * beam * (0.35 + 0.65 * turb) + hot * (0.4 + 0.6 * beam) + 0.75 * hand);
   }
   function ringGradient(bs, scale) {
     if (!ctx.createConicGradient) return rgba(mix(RING, RING, 0), 0.6 * scale);
@@ -368,7 +386,8 @@
     }
     const phi = ((now || 0) / BEAM_PERIOD) * TAU * spin;
     // What the sound is allowed to know: where the bright side is, how hot the spots are.
-    vis.phi = phi; vis.hot = 0;
+    sense();
+    vis.phi = phi; vis.hot = 0.8 * touch.s; vis.near = touch.s;
     for (const sp of spots) vis.hot += sp.peak * Math.sin(Math.PI * Math.min(1, Math.max(0, (t - sp.born) / sp.life)));
     const bs = [];
     for (let i = 0; i < STOPS; i++) bs.push(brightness((i / STOPS) * TAU, t, phi));
@@ -686,11 +705,15 @@
     const blg = ac.createGain(); blg.gain.value = 0.004;
     bl.connect(blg); blg.connect(breath.gain);
     nz.connect(bp); bp.connect(breath); breath.connect(filter); nz.start(now); bl.start(now); sources.push(nz, bl);
-    graph = { master, filter, pan, swell, voices, upper, colour, sources, choir, inhale, strings };
+    // Key: one shared offset, in cents, under every pitch — the whole hum can move and come home.
+    const key = ac.createConstantSource(); key.offset.value = 0; key.start(now); sources.push(key);
+    for (const o of [...voices.map((v) => v.osc), ...upper.map((u) => u.osc), ...choir.flatMap((c) => [...c.oscs, c.pulse]), ...strings.flatMap((sg) => sg.oscs), col])
+      key.connect(o.detune);
+    graph = { master, filter, pan, swell, voices, upper, colour, sources, choir, inhale, strings, key };
   }
   function destroy() {
     for (const id of timers) clearTimeout(id);
-    timers = []; detuning = false; blooming = 0;
+    timers = []; detuning = false; blooming = 0; away = false;
     for (const s of graph.sources) { try { s.stop(); } catch (e) {} }
     graph.master.disconnect();
     graph = null;
@@ -871,6 +894,24 @@
       scheduleTremolo();
     }, 25000 + Math.random() * 35000);
   }
+  // Leaving home: every 3–6 min the whole hum glides (15–30 s, eased) to a near key in just
+  // intonation — a whole tone either way, a minor third up, a major third or a fourth down —
+  // stays 1–2.5 min, then glides home to the year tone. Chords, pulses and rhythms ride along.
+  const KEYS = [-498, -386, -204, 204, 316];
+  let away = false;
+  function scheduleKey(first) {
+    later(() => {
+      if (!graph) return;
+      const p = graph.key.offset, t = actx.currentTime, from = p.value;
+      const to = away ? 0 : KEYS[Math.floor(Math.random() * KEYS.length)];
+      const dur = 15 + Math.random() * 15, curve = new Float32Array(96);
+      for (let i = 0; i < 96; i++) { const x = i / 95; curve[i] = from + (to - from) * x * x * (3 - 2 * x); }
+      p.cancelScheduledValues(t); p.setValueCurveAtTime(curve, t, dur);
+      away = !away;
+      if (debug) console.log('[hum] key →', to + '¢', dur.toFixed(0) + 's');
+      scheduleKey(false);
+    }, (first || !away ? 180000 + Math.random() * 180000 : 60000 + Math.random() * 90000));
+  }
   function scheduleColour() {
     later(() => {
       if (!graph) return;
@@ -886,6 +927,7 @@
     const t = actx.currentTime;
     graph.pan.pan.setTargetAtTime(0.1 * Math.cos(vis.phi), t, 0.5);   // a hint of the bright side; the layers do the moving
     graph.swell.gain.setTargetAtTime(1 + 0.9 * Math.min(1, vis.hot), t, 0.7);
+    graph.filter.frequency.setTargetAtTime(1700 + 900 * vis.near, t, 0.4);   // the hand near the edge opens the sound
   }
   function ramp(to, secs) {
     const g = graph.master.gain, t = actx.currentTime;
@@ -922,7 +964,7 @@
     unmute();
     actx.resume().catch(() => {});
     clearTimeout(tearDown);
-    if (!graph) { build(); scheduleDetune(); scheduleGlide(); scheduleColour(); scheduleBreath(); scheduleVibrato(); scheduleStrings(); scheduleTremolo(); }
+    if (!graph) { build(); scheduleDetune(); scheduleGlide(); scheduleColour(); scheduleBreath(); scheduleVibrato(); scheduleStrings(); scheduleTremolo(); scheduleKey(true); }
     fadeIn(LEVEL, 10);
     if (debug) window.__hum = { ctx: actx, master: graph.master, graph };
   }

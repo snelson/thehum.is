@@ -27,6 +27,8 @@ While it plays, the void, ring
 and sound breathe together on the year tone slowed 10 more octaves (one
 swell every ~7.5 s), and the title pulses.
 Now and then upper layers pulse at their own pitch slowed into rhythm, so
-the chord is heard as a polyrhythm against the breath (major: 4:5:6 per bar). Debug hook only with #humdebug.
+the chord is heard as a polyrhythm against the breath (major: 4:5:6 per bar).
+Every few minutes the whole hum glides to a near key and later home again.
+A hand near the horizon brightens the ring beneath it and opens the sound. Debug hook only with #humdebug.
 
 When thehum.studio is live, add a quiet link beside thehum.works in the footer.
