@@ -1,42 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Hum</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            background: #1a1a1a;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: system-ui, -apple-system, sans-serif;
-        }
-        
-        h1 {
-            color: #fafaf9;
-            font-size: 3rem;
-            font-weight: 300;
-            letter-spacing: 0.5rem;
-            text-transform: uppercase;
-        }
-        
-        @media (max-width: 768px) {
-            h1 {
-                font-size: 2rem;
-                letter-spacing: 0.3rem;
-            }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Everything is humming. Alignment is not sameness: the tension of differences, held until it sings.">
+<title>The Hum</title>
+<style>
+/* Layout: one centered column on a dark field — the existing thehum.is look, with the manifesto beneath the name. */
+:root {
+  --bg: #1a1a1a;
+  --ink: #fafaf9;
+  --soft: #b9b7b2;
+  --faint: #7d7b77;
+  --line: #2e2d2b;
+  --f-body: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--f-body);
+  min-height: 100%; display: flex; align-items: center; justify-content: center;
+  padding: 64px 16px;
+}
+main { width: 100%; max-width: 34rem; display: grid; gap: 56px; text-align: center; }
+h1 {
+  font-size: 3rem; font-weight: 300; letter-spacing: 0.5rem; text-transform: uppercase;
+  margin-right: -0.5rem; /* balance the trailing letter-spacing so the word centers */
+}
+.verse { display: grid; gap: 28px; font-weight: 300; font-size: 1.25rem; line-height: 1.7; color: var(--soft); }
+.verse p span { display: block; text-wrap: balance; }
+.verse .turn { color: var(--ink); }
+nav { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px 40px; padding-top: 28px; border-top: 1px solid var(--line); }
+nav a {
+  color: var(--faint); text-decoration: none; font-size: 0.9rem; letter-spacing: 0.06em;
+  display: inline-flex; gap: 8px; align-items: baseline; padding: 6px 2px;
+}
+nav a span { color: var(--soft); }
+nav a:hover, nav a:focus-visible { color: var(--soft); }
+nav a:hover span, nav a:focus-visible span { color: var(--ink); }
+a:focus-visible { outline: 1px solid var(--soft); outline-offset: 4px; }
+@media (max-width: 768px) {
+  h1 { font-size: 2rem; letter-spacing: 0.3rem; margin-right: -0.3rem; }
+  .verse { font-size: 1.1rem; gap: 24px; }
+  main { gap: 44px; }
+}
+</style>
 </head>
 <body>
-    <h1>The Hum</h1>
+<main>
+  <h1>The Hum</h1>
+  <div class="verse">
+    <p><span>Everything is humming.</span><span>One tone alone is sameness.</span><span>Every tone at once is noise.</span><span>Harmony lives at the edges between them,</span><span>where each voice keeps its own note.</span></p>
+    <p class="turn"><span>Alignment is not sameness.</span><span>The tension of differences,</span><span>held until it sings.</span></p>
+  </div>
+  <nav aria-label="The Hum">
+    <a href="https://thehum.works">Work with it <span>thehum.works</span></a>
+  </nav>
+</main>
 </body>
 </html>
