@@ -19,7 +19,8 @@ tone, Earth's orbit raised 32 octaves (136.10 Hz; root an octave down at
 choir. The chord walks slowly between neighbours on the same root (open fifth,
 major, sus, minor, sevenths, neutral third; brief clusters that always
 resolve) on uneven timing: holds and glide speeds vary, and each voice
-glides on its own clock. Now and then one tone blooms into vibrato. It
+glides on its own clock. Now and then one tone blooms into vibrato. Every minute or two a string section
+swells in an octave over the choir and fades away. It
 follows the ring: it leans toward the bright side and swells with hot spots.
 While it plays, the title pulses. Debug hook only with #humdebug.
 
