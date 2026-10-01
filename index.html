@@ -2,61 +2,389 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="description" content="Everything is humming. Alignment is not sameness: the tension of differences, held until it sings.">
+<meta name="theme-color" content="#0b0a14">
+<link rel="canonical" href="https://thehum.is/">
+<meta property="og:title" content="The Hum">
+<meta property="og:description" content="Alignment is not sameness. The tension of differences, held until it sings.">
+<meta property="og:url" content="https://thehum.is/">
 <title>The Hum</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;1,6..72,300&display=swap" rel="stylesheet">
 <style>
-/* Layout: one centered column on a dark field — the existing thehum.is look, with the manifesto beneath the name. */
-:root {
-  --bg: #1a1a1a;
-  --ink: #fafaf9;
-  --soft: #b9b7b2;
-  --faint: #7d7b77;
-  --line: #2e2d2b;
-  --f-body: system-ui, -apple-system, "Segoe UI", sans-serif;
-  color-scheme: dark;
-}
-* { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { height: 100%; }
-body {
-  background: var(--bg); color: var(--ink); font-family: var(--f-body);
-  min-height: 100%; display: flex; align-items: center; justify-content: center;
-  padding: 64px 16px;
-}
-main { width: 100%; max-width: 34rem; display: grid; gap: 56px; text-align: center; }
-h1 {
-  font-size: 3rem; font-weight: 300; letter-spacing: 0.5rem; text-transform: uppercase;
-  margin-right: -0.5rem; /* balance the trailing letter-spacing so the word centers */
-}
-.verse { display: grid; gap: 28px; font-weight: 300; font-size: 1.25rem; line-height: 1.7; color: var(--soft); }
-.verse p span { display: block; text-wrap: balance; }
-.verse .turn { color: var(--ink); }
-nav { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px 40px; padding-top: 28px; border-top: 1px solid var(--line); }
-nav a {
-  color: var(--faint); text-decoration: none; font-size: 0.9rem; letter-spacing: 0.06em;
-  display: inline-flex; gap: 8px; align-items: baseline; padding: 6px 2px;
-}
-nav a span { color: var(--soft); }
-nav a:hover, nav a:focus-visible { color: var(--soft); }
-nav a:hover span, nav a:focus-visible span { color: var(--ink); }
-a:focus-visible { outline: 1px solid var(--soft); outline-offset: 4px; }
-@media (max-width: 768px) {
-  h1 { font-size: 2rem; letter-spacing: 0.3rem; margin-right: -0.3rem; }
-  .verse { font-size: 1.1rem; gap: 24px; }
-  main { gap: 44px; }
-}
+  /* One dark theme, on purpose. The sister page radiates; this one draws in. */
+  :root {
+    color-scheme: dark;
+    --field: #0b0a14;
+    --corner: #060510;
+    --ink: #e6e2f0;
+    --ink-dim: #8f87b0;
+    --ring: #b48cff;
+    --magenta: #ff5fb8;
+    --teal: #4fd6c8;
+    /* Void diameter. Desktop: fixed. Phone: wider than the screen, so the
+       ring reads as a horizon, not a badge. Cap keeps the verse inside. */
+    --d: 560px;
+    --inscription-size: 11px;
+    --verse-size: 20px;
+    --verse-lh: 1.55;
+    --verse-w: min(80vw, 420px);
+    --footer-h: 44px;
+    --footer-gap: 28px;
+  }
+  @media (max-width: 700px) {
+    :root {
+      --d: clamp(560px, 150vw, 720px);
+      --inscription-size: 10px;
+      --verse-size: 17px;
+      --verse-lh: 1.5;
+      --verse-w: 80vw;
+    }
+  }
+
+  html { background: var(--corner); }
+  body {
+    margin: 0;
+    min-height: 100svh;
+    position: relative;
+    color: var(--ink);
+    background: var(--field);
+    /* Vignette only. No other gradient belongs here. */
+    background-image: radial-gradient(ellipse 80% 80% at 50% 50%, var(--field) 55%, var(--corner) 100%);
+    background-attachment: fixed;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* The stage is pinned to the viewport: the void's center is the viewport's. */
+  .stage {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .stage canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  /* Flat interior. Nothing animated crosses it; the canvas only paints outside r. */
+  .void {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--d);
+    height: var(--d);
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    /* Depth without motion: just off the field at the rim, near-black at the center. A hole that recedes. */
+    background: radial-gradient(circle closest-side, #040309 0%, #06050d 45%, #0a0915 82%, #0d0b18 100%);
+  }
+  /* The name frames the page from the top edge, as the link does from the bottom. */
+  .head {
+    position: absolute; left: 0; right: 0; top: 0; z-index: 1; margin: 0;
+    padding-top: calc(var(--footer-gap) + 14px + env(safe-area-inset-top, 0px));
+    text-align: center;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-weight: 500; font-size: var(--inscription-size);
+    letter-spacing: 0.38em; padding-left: 0.38em; text-transform: uppercase; /* padding balances the trailing tracking */
+    color: var(--ink-dim); opacity: 0.75;
+  }
+
+  /* Verse sits in flow so a short viewport scrolls instead of clipping.
+     Symmetric padding keeps it on the viewport center when it fits; the
+     bottom pad also reserves the footer's room. */
+  .verse-wrap {
+    position: relative;
+    z-index: 1;
+    min-height: 100svh;
+    box-sizing: border-box;
+    padding: 84px 0 calc(84px + env(safe-area-inset-bottom, 0px));
+    display: grid;
+    place-items: center;
+  }
+  .verse {
+    width: var(--verse-w);
+    margin: 0;
+    text-align: center;
+    font-family: "Newsreader", Georgia, "Times New Roman", serif;
+    font-weight: 300;
+    font-size: var(--verse-size);
+    line-height: var(--verse-lh);
+    color: var(--ink);
+  }
+  .verse p { margin: 0; }
+  .verse p + p { margin-top: calc(var(--verse-size) * var(--verse-lh)); }
+  .verse span {
+    display: block;
+    text-wrap: balance;
+  }
+  .verse .turn {
+    font-style: italic;
+    color: #f3f0fa;
+  }
+
+  .foot {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+    padding-bottom: calc(var(--footer-gap) + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    justify-content: center;
+  }
+  .foot a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--footer-h);
+    padding: 0 12px;
+    font-family: "Newsreader", Georgia, serif;
+    font-style: italic;
+    font-weight: 300;
+    font-size: 14px;
+    color: var(--ink-dim);
+    opacity: 0.75;
+    text-decoration: none;
+    transition: color 300ms ease, opacity 300ms ease;
+  }
+  .foot a:hover, .foot a:focus-visible {
+    color: var(--ink);
+    opacity: 1;
+    outline: none;
+  }
 </style>
 </head>
 <body>
-<main>
-  <h1>The Hum</h1>
+<div class="stage" aria-hidden="true">
+  <canvas id="field"></canvas>
+  <div class="void"></div>
+</div>
+
+<h1 class="head">The Hum</h1>
+
+<main class="verse-wrap">
   <div class="verse">
-    <p><span>Everything is humming.</span><span>One tone alone is sameness.</span><span>Every tone at once is noise.</span><span>Harmony lives at the edges between them,</span><span>where each voice keeps its own note.</span></p>
-    <p class="turn"><span>Alignment is not sameness.</span><span>The tension of differences,</span><span>held until it sings.</span></p>
+    <p>
+      <span>Everything is humming.</span>
+      <span>One tone alone is sameness.</span>
+      <span>Every tone at once is noise.</span>
+      <span>Harmony lives at the edges between them,</span>
+      <span>where each voice keeps its own note.</span>
+    </p>
+    <p class="turn">
+      <span>Alignment is not sameness.</span>
+      <span>The tension of differences,</span>
+      <span>held until it sings.</span>
+    </p>
   </div>
-  <nav aria-label="The Hum">
-    <a href="https://thehum.works">Work with it <span>thehum.works</span></a>
-  </nav>
 </main>
+
+<footer class="foot">
+  <a href="https://thehum.works">thehum.works</a>
+</footer>
+
+<script>
+(() => {
+  const canvas = document.getElementById('field');
+  const ctx = canvas.getContext('2d');
+  const voidEl = document.querySelector('.void');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const RING = '#b48cff', MAGENTA = '#ff5fb8', TEAL = '#4fd6c8';
+  const TAU = Math.PI * 2;
+
+  let W = 0, H = 0, dpr = 1, cx = 0, cy = 0, r = 280, maxR = 0;
+  let glow = null;      // cached outer glow, drawn once per resize
+  let ringGrad = null;  // cached conic tint
+  let points = [];
+
+  const mix = (a, b, t) => {
+    const pa = [1, 3, 5].map(i => parseInt(a.slice(i, i + 2), 16));
+    const pb = [1, 3, 5].map(i => parseInt(b.slice(i, i + 2), 16));
+    return pa.map((v, i) => Math.round(v + (pb[i] - v) * t));
+  };
+  const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+
+  // Far points are dim and cool; near the ring they warm toward the ring itself.
+  const FAR = mix('#5e5484', TEAL, 0.35);
+  const NEAR = mix(RING, MAGENTA, 0.25);
+
+  function layout() {
+    dpr = Math.min(devicePixelRatio || 1, 2);
+    W = innerWidth; H = innerHeight;
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cx = W / 2; cy = H / 2;
+    r = voidEl.getBoundingClientRect().width / 2;
+    maxR = Math.hypot(W, H) / 2;
+
+    // Glow: outside the ring only, so the interior stays flat.
+    const gs = Math.ceil((r + 24) * 2), g = document.createElement('canvas');
+    g.width = g.height = Math.round(gs * dpr);
+    const gc = g.getContext('2d'); gc.scale(dpr, dpr);
+    const grad = gc.createRadialGradient(gs / 2, gs / 2, 0, gs / 2, gs / 2, r + 18);
+    const e = r / (r + 18);
+    grad.addColorStop(0, 'rgba(180,140,255,0)');
+    grad.addColorStop(e, 'rgba(180,140,255,0)');
+    grad.addColorStop(e + 0.0001, 'rgba(180,140,255,0.22)');
+    grad.addColorStop(e + (1 - e) * 0.35, 'rgba(180,140,255,0.07)');
+    grad.addColorStop(1, 'rgba(180,140,255,0)');
+    gc.fillStyle = grad; gc.fillRect(0, 0, gs, gs);
+    glow = { c: g, s: gs };
+
+    // Ring tint: magenta near 11 o'clock, teal near 5. Narrow, faint.
+    if (ctx.createConicGradient) {
+      ringGrad = ctx.createConicGradient(0, cx, cy);
+      const m = rgba(mix(RING, MAGENTA, 0.5), 1), t = rgba(mix(RING, TEAL, 0.5), 1);
+      [[0, RING], [0.10, RING], [0.1667, t], [0.24, RING], [0.60, RING], [0.6667, m], [0.73, RING], [1, RING]]
+        .forEach(([s, col]) => ringGrad.addColorStop(s, col));
+    } else ringGrad = RING;
+
+    const target = W < 700 ? 110 : 240;
+    while (points.length < target) points.push(spawn(true));
+    points.length = target;
+  }
+
+  // Shared rotation sense, small per-point variation.
+  const spin = Math.random() < 0.5 ? 1 : -1;
+  function spawn(initial) {
+    // On a phone the ring overflows the sides; only the caps above and below
+    // show sky. Lean the births that way so the field isn't empty there.
+    let a = Math.random() * TAU;
+    if (W < H && Math.random() < 0.7) a = (Math.random() < 0.5 ? -1 : 1) * Math.PI / 2 + (Math.random() - 0.5) * 1.2;
+    const p = {
+      a,
+      rad: initial ? r + 6 + Math.random() * (maxR * 1.6 - r - 6) : maxR * (1.4 + Math.random() * 0.4),
+      born: maxR * (1.4 + Math.random() * 0.4),
+      w: spin * (2 + (Math.random() - 0.5) * 1.2) * Math.PI / 180,
+      size: 0.9 + Math.random() * 1.1
+    };
+    if (initial) p.born = Math.max(p.born, p.rad + 1);
+    return p;
+  }
+
+  function step(dt) {
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      const d = p.rad - r;
+      // Gravity: slow far out, steep only in the last stretch.
+      let v = 6 + 400 / (d + 10);
+      if (d > 60) v = Math.min(v, 10);
+      p.rad -= v * dt;
+      p.a += (p.w * 120 / Math.max(p.rad, 1)) * dt;   // constant sideways speed in px: the sky drains rather than rotates
+      if (p.rad <= r + 6) points[i] = spawn(false);   // nothing enters the ring
+    }
+  }
+
+  // Doppler beaming: a real photon ring is brighter on the side moving toward us.
+  // The bright side travels the ring once a minute, so it has weight and motion
+  // without getting louder. Drawn as short arcs so brightness can vary by angle.
+  const STOPS = 96, BEAM_PERIOD = 60000;
+  // Base tint by angle (fraction of a turn from 3 o'clock, clockwise): teal near 5, magenta near 11.
+  const near = (f, c, w) => { const d = Math.min(Math.abs(f - c), 1 - Math.abs(f - c)); return Math.exp(-(d * d) / (2 * w * w)); };
+  const tintAt = f => mix(rgba0(mix(RING, TEAL, 0.5 * near(f, 0.1667, 0.035))), MAGENTA, 0.5 * near(f, 0.6667, 0.035));
+  // Accretion light is clumpy: brightness churns along the ring (three drifting waves at
+  // incommensurate speeds) and hot spots flare, orbit and fade. Beaming still favours one side.
+  const spots = [];
+  function newSpot(t) {
+    return { th: Math.random() * TAU, w: spin * (0.12 + Math.random() * 0.25), born: t,
+             life: 4 + Math.random() * 7, sig: 0.09 + Math.random() * 0.1, peak: 0.35 + Math.random() * 0.35 };
+  }
+  function brightness(th, t, phi) {
+    const beam = Math.pow((1 + Math.cos(th - phi)) / 2, 1.6);
+    const turb = 0.5 + 0.5 * (0.5 * Math.sin(3 * th + 0.21 * t * spin) + 0.3 * Math.sin(7 * th - 0.37 * t + 1.3) + 0.2 * Math.sin(13 * th + 0.53 * t * spin + 2.1));
+    let hot = 0;
+    for (const sp of spots) {
+      const age = t - sp.born, env = Math.sin(Math.PI * Math.min(1, Math.max(0, age / sp.life)));
+      let d = Math.abs(((th - (sp.th + sp.w * age)) % TAU + TAU) % TAU); d = Math.min(d, TAU - d);
+      hot += sp.peak * env * Math.exp(-(d * d) / (2 * sp.sig * sp.sig));
+    }
+    return Math.min(1, 0.12 + 0.88 * beam * (0.35 + 0.65 * turb) + hot * (0.4 + 0.6 * beam));
+  }
+  function ringGradient(bs, scale) {
+    if (!ctx.createConicGradient) return rgba(mix(RING, RING, 0), 0.6 * scale);
+    const g = ctx.createConicGradient(0, cx, cy);
+    for (let i = 0; i <= STOPS; i++) g.addColorStop(i / STOPS, rgba(tintAt(i / STOPS), Math.min(1, bs[i % STOPS] * scale)));
+    return g;
+  }
+  function drawRing(alpha, now) {
+    const t = (now || 0) / 1000;
+    if (!reduced) {
+      while (spots.length < 3) spots.push(newSpot(t));
+      for (let i = 0; i < spots.length; i++) if (t - spots[i].born > spots[i].life) spots[i] = newSpot(t);
+    }
+    const phi = ((now || 0) / BEAM_PERIOD) * TAU * spin;
+    const bs = [];
+    for (let i = 0; i < STOPS; i++) bs.push(brightness((i / STOPS) * TAU, t, phi));
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(glow.c, cx - glow.s / 2, cy - glow.s / 2, glow.s, glow.s);
+    // Outer profile: one soft band fading ~14px outward, fuller where the ring is bright.
+    if ('filter' in ctx) {
+      // Three passes, widest and faintest first: a long haze, a wash, then the body.
+      ctx.filter = 'blur(18px)';
+      ctx.strokeStyle = ringGradient(bs, 0.09); ctx.lineWidth = 44;
+      ctx.beginPath(); ctx.arc(cx, cy, r + 20, 0, TAU); ctx.stroke();
+      ctx.filter = 'blur(19px)';
+      ctx.strokeStyle = ringGradient(bs, 0.1); ctx.lineWidth = 30;
+      ctx.beginPath(); ctx.arc(cx, cy, r + 6, 0, TAU); ctx.stroke();
+      ctx.filter = 'blur(7px)';
+      ctx.strokeStyle = ringGradient(bs, 0.2); ctx.lineWidth = 14;
+      ctx.beginPath(); ctx.arc(cx, cy, r + 7, 0, TAU); ctx.stroke();
+      ctx.filter = 'none';
+    } else {
+      for (let k = 32; k >= 1; k--) {   // tight overlap so no grooves resolve; long, soft tail
+        ctx.strokeStyle = ringGradient(bs, 0.22 * Math.pow(1 - k / 33, 2.8)); ctx.lineWidth = 2.4;
+        ctx.beginPath(); ctx.arc(cx, cy, r + 0.5 + k * 1.1, 0, TAU); ctx.stroke();
+      }
+    }
+    // The horizon itself: razor sharp on the inside, where light stops.
+    ctx.strokeStyle = ringGradient(bs.map(b => 0.3 + 0.7 * b), 1); ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawPoints() {
+    for (const p of points) {
+      const x = cx + Math.cos(p.a) * p.rad, y = cy + Math.sin(p.a) * p.rad;
+      let t = Math.min(1, Math.max(0, 1 - (p.rad - r) / (p.born - r)));
+      t = t * t;              // most of the warming happens near the ring
+      const alpha = 0.2 + 0.55 * t, size = p.size;
+      ctx.fillStyle = rgba(mix(rgba0(FAR), rgba0(NEAR), t), alpha);
+      ctx.fillRect(x - size / 2, y - size / 2, size, size);
+    }
+  }
+  const rgba0 = c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
+
+  let last = 0, t0 = performance.now(), raf = 0;
+  function frame(now) {
+    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
+    ctx.clearRect(0, 0, W, H);
+    step(dt);
+    drawPoints();
+    drawRing(1, now - t0);
+    raf = requestAnimationFrame(frame);
+  }
+  function start() { if (!raf) { last = performance.now(); raf = requestAnimationFrame(frame); } }
+  function stop() { cancelAnimationFrame(raf); raf = 0; }
+
+  function drawStatic() { ctx.clearRect(0, 0, W, H); drawRing(0.9, BEAM_PERIOD * 0.15); }
+
+  layout();
+  if (reduced) {
+    drawStatic();
+    addEventListener('resize', () => { layout(); drawStatic(); });
+  } else {
+    addEventListener('resize', layout);
+    document.addEventListener('visibilitychange', () => document.hidden ? stop() : start());
+    start();
+  }
+})();
+</script>
 </body>
 </html>
