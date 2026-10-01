@@ -22,6 +22,8 @@ resolve) on uneven timing: holds and glide speeds vary, and each voice
 glides on its own clock. Now and then one tone blooms into vibrato. Every minute or two a string section
 swells in an octave over the choir and fades away. It
 follows the ring: it leans toward the bright side and swells with hot spots.
-While it plays, the title pulses. Debug hook only with #humdebug.
+While it plays, the void, ring
+and sound breathe together on the year tone slowed 10 more octaves (one
+swell every ~7.5 s), and the title pulses. Debug hook only with #humdebug.
 
 When thehum.studio is live, add a quiet link beside thehum.works in the footer.

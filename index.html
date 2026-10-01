@@ -243,7 +243,7 @@
   const RING = '#b48cff', MAGENTA = '#ff5fb8', TEAL = '#4fd6c8';
   const TAU = Math.PI * 2;
 
-  let W = 0, H = 0, dpr = 1, cx = 0, cy = 0, r = 280, maxR = 0;
+  let W = 0, H = 0, dpr = 1, cx = 0, cy = 0, r = 280, r0 = 280, maxR = 0, lastScale = 1;
   let glow = null;      // cached outer glow, drawn once per resize
   let ringGrad = null;  // cached conic tint
   let points = [];
@@ -266,7 +266,7 @@
     canvas.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     cx = W / 2; cy = H / 2;
-    r = voidEl.getBoundingClientRect().width / 2;
+    r = r0 = voidEl.offsetWidth / 2;   // layout size, unaffected by the pulse's scale
     maxR = Math.hypot(W, H) / 2;
 
     // Glow: outside the ring only, so the interior stays flat.
@@ -372,20 +372,27 @@
     for (const sp of spots) vis.hot += sp.peak * Math.sin(Math.PI * Math.min(1, Math.max(0, (t - sp.born) / sp.life)));
     const bs = [];
     for (let i = 0; i < STOPS; i++) bs.push(brightness((i / STOPS) * TAU, t, phi));
+    const pz = vis.pulse ? vis.pulse() : 0;   // the hum's slow pulse, 0–1; 0 when silent
+    const k = 1 + 0.7 * pz;
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.drawImage(glow.c, cx - glow.s / 2, cy - glow.s / 2, glow.s, glow.s);
+    const g0 = glow.s * r / r0;   // the glow was drawn for r0; follow the breathing edge
+    ctx.drawImage(glow.c, cx - g0 / 2, cy - g0 / 2, g0, g0);
+    if (pz > 0.01) {
+      const gs = g0 * (1 + 0.04 * pz);
+      ctx.globalAlpha = alpha * 0.6 * pz; ctx.drawImage(glow.c, cx - gs / 2, cy - gs / 2, gs, gs); ctx.globalAlpha = alpha;
+    }
     // Outer profile: one soft band fading ~14px outward, fuller where the ring is bright.
     if ('filter' in ctx) {
       // Three passes, widest and faintest first: a long haze, a wash, then the body.
       ctx.filter = 'blur(18px)';
-      ctx.strokeStyle = ringGradient(bs, 0.09); ctx.lineWidth = 44;
-      ctx.beginPath(); ctx.arc(cx, cy, r + 20, 0, TAU); ctx.stroke();
+      ctx.strokeStyle = ringGradient(bs, 0.09 * k); ctx.lineWidth = 44 + 12 * pz;
+      ctx.beginPath(); ctx.arc(cx, cy, r + 20 + 6 * pz, 0, TAU); ctx.stroke();
       ctx.filter = 'blur(19px)';
-      ctx.strokeStyle = ringGradient(bs, 0.1); ctx.lineWidth = 30;
+      ctx.strokeStyle = ringGradient(bs, 0.1 * k); ctx.lineWidth = 30;
       ctx.beginPath(); ctx.arc(cx, cy, r + 6, 0, TAU); ctx.stroke();
       ctx.filter = 'blur(7px)';
-      ctx.strokeStyle = ringGradient(bs, 0.2); ctx.lineWidth = 14;
+      ctx.strokeStyle = ringGradient(bs, 0.2 * (1 + 0.35 * pz)); ctx.lineWidth = 14;
       ctx.beginPath(); ctx.arc(cx, cy, r + 7, 0, TAU); ctx.stroke();
       ctx.filter = 'none';
     } else {
@@ -417,6 +424,10 @@
   function frame(now) {
     const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
     ctx.clearRect(0, 0, W, H);
+    // The void breathes with the hum: up to 4.5% wider on each swell, back on the ebb.
+    const sc = 1 + 0.045 * (vis.pulse ? vis.pulse() : 0);
+    r = r0 * sc;
+    if (Math.abs(sc - lastScale) > 0.0002) { voidEl.style.transform = `translate(-50%, -50%) scale(${sc.toFixed(4)})`; lastScale = sc; }
     step(dt);
     drawPoints();
     drawRing(1, now - t0);
@@ -492,6 +503,15 @@
   const SWELL = 4, LEVEL = 0.55;                                         // which voice the hot spots lean on; master ceiling
   const btn = document.getElementById('hum'), hint = document.getElementById('hum-hint');
   const debug = location.hash === '#humdebug';
+  const PULSE_HZ = (ROOT * 2) / 1024;
+  let pulseT0 = 0;
+  // What the ring is allowed to know: where the pulse is (0–1), scaled by how present the sound is.
+  vis.pulse = () => {
+    if (!graph || !actx) return 0;
+    const t = actx.currentTime - (actx.outputLatency || actx.baseLatency || 0);
+    const presence = Math.min(1, Math.max(0, graph.master.gain.value / LEVEL));
+    return presence * (1 + Math.sin(TAU * PULSE_HZ * (t - pulseT0))) / 2;
+  };
   let actx = null, graph = null, on = false, timers = [], tearDown = 0, hideTimer = 0, silent = null;
   let lastTick = 0, chord = 'major', detuning = false;
 
@@ -522,8 +542,15 @@
     const conv = ac.createConvolver(); conv.buffer = impulse(ac, 5);
     const wet = ac.createGain(); wet.gain.value = 0.4;
     // Pull the low end back: a gentle shelf, so the bass is a floor, not the room.
+    // The pulse: the year tone again, 10 octaves below the root's octave (136.10 Hz / 1024 = one
+    // swell every ~7.5 s). The whole hum leans louder and brighter on it; the ring reads the same clock.
+    const pulse = ac.createGain(); pulse.gain.value = 1;
+    const po = ac.createOscillator(); po.frequency.value = PULSE_HZ;
+    const pdg = ac.createGain(); pdg.gain.value = 0.2; po.connect(pdg); pdg.connect(pulse.gain);
+    const pfg = ac.createGain(); pfg.gain.value = 250; po.connect(pfg); pfg.connect(filter.frequency);
+    po.start(now); sources.push(po); pulseT0 = now;
     const shelf = ac.createBiquadFilter(); shelf.type = 'lowshelf'; shelf.frequency.value = 150; shelf.gain.value = -6;
-    filter.connect(shelf); shelf.connect(pan); pan.connect(dry); pan.connect(conv); conv.connect(wet);
+    filter.connect(pulse); pulse.connect(shelf); shelf.connect(pan); pan.connect(dry); pan.connect(conv); conv.connect(wet);
     dry.connect(master); wet.connect(master); master.connect(ac.destination);
     // Air: the lowpass wanders 1000–2400 Hz over ~40 s, open enough for the upper voices.
     const fl = ac.createOscillator(); fl.frequency.value = 1 / 40;
