@@ -379,15 +379,15 @@
     const g0 = glow.s * r / r0;   // the glow was drawn for r0; follow the breathing edge
     ctx.drawImage(glow.c, cx - g0 / 2, cy - g0 / 2, g0, g0);
     if (pz > 0.01) {
-      const gs = g0 * (1 + 0.04 * pz);
-      ctx.globalAlpha = alpha * 0.6 * pz; ctx.drawImage(glow.c, cx - gs / 2, cy - gs / 2, gs, gs); ctx.globalAlpha = alpha;
+      // Brighter on the swell, never bigger: the glow's inner edge must stay on the horizon.
+      ctx.globalAlpha = alpha * 0.6 * pz; ctx.drawImage(glow.c, cx - g0 / 2, cy - g0 / 2, g0, g0); ctx.globalAlpha = alpha;
     }
     // Outer profile: one soft band fading ~14px outward, fuller where the ring is bright.
     if ('filter' in ctx) {
       // Three passes, widest and faintest first: a long haze, a wash, then the body.
       ctx.filter = 'blur(18px)';
       ctx.strokeStyle = ringGradient(bs, 0.09 * k); ctx.lineWidth = 44 + 12 * pz;
-      ctx.beginPath(); ctx.arc(cx, cy, r + 20 + 6 * pz, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, cy, r + 20, 0, TAU); ctx.stroke();
       ctx.filter = 'blur(19px)';
       ctx.strokeStyle = ringGradient(bs, 0.1 * k); ctx.lineWidth = 30;
       ctx.beginPath(); ctx.arc(cx, cy, r + 6, 0, TAU); ctx.stroke();
@@ -556,6 +556,13 @@
     const fl = ac.createOscillator(); fl.frequency.value = 1 / 40;
     const flg = ac.createGain(); flg.gain.value = 700;
     fl.connect(flg); flg.connect(filter.frequency); fl.start(now); sources.push(fl);
+    // Drift: a panner wanders around its home on a slow sine of its own (20–70 s a sweep, random start).
+    const drift = (pan, home, width) => {
+      pan.value = home;
+      const o = ac.createOscillator(); o.frequency.value = 1 / (20 + Math.random() * 50);
+      const k = ac.createGain(); k.gain.value = width;
+      o.connect(k); k.connect(pan); o.start(now + Math.random() * 20); sources.push(o);
+    };
     // Vibrato, idle until a bloom: a ~5–6 Hz sine into each pitch's detune, depth 0 at rest.
     const vibrato = (targets) => {
       const o = ac.createOscillator(); o.frequency.value = 5.5;
@@ -573,7 +580,9 @@
       const lfo = ac.createOscillator(); lfo.frequency.value = 1 / LFO_PERIODS[i];
       const lg = ac.createGain(); lg.gain.value = VOICE_GAIN[i] * 0.35;
       lfo.connect(lg); lg.connect(g.gain);
-      osc.connect(g); g.connect(i === SWELL ? swell : filter);
+      // The floor holds the middle: root and fifth dead centre, the higher three spread a little.
+      const sp = ac.createStereoPanner(); if (i >= 2) drift(sp.pan, [0, 0, -0.15, 0.15, -0.1][i], 0.2);
+      osc.connect(g); g.connect(sp); sp.connect(i === SWELL ? swell : filter);
       osc.start(now); lfo.start(now); sources.push(osc, lfo);
       return { osc, g, vib: vibrato([osc.detune]), kind: 'main' };
     });
@@ -582,7 +591,7 @@
       const g = ac.createGain(); g.gain.value = UPPER_GAIN[i] * 0.8;   // swells 60–100%: the drone holds
       const lfo = ac.createOscillator(); lfo.frequency.value = 1 / UPPER_PERIODS[i];
       const lg = ac.createGain(); lg.gain.value = UPPER_GAIN[i] * 0.2;
-      const sp = ac.createStereoPanner(); sp.pan.value = UPPER_PAN[i];
+      const sp = ac.createStereoPanner(); drift(sp.pan, UPPER_PAN[i] * 0.6, 0.55);
       lfo.connect(lg); lg.connect(g.gain);
       osc.connect(g); g.connect(sp); sp.connect(filter);
       osc.start(now); lfo.start(now + Math.random() * UPPER_PERIODS[i]); sources.push(osc, lfo);
@@ -613,7 +622,7 @@
       const lfo = ac.createOscillator(); lfo.frequency.value = 1 / CHOIR_PERIODS[i];
       const lg = ac.createGain(); lg.gain.value = CHOIR_GAIN[i] * 0.2;
       const phrase = ac.createGain(); phrase.gain.value = 1;                                 // breath gaps
-      const sp = ac.createStereoPanner(); sp.pan.value = CHOIR_PAN[i];
+      const sp = ac.createStereoPanner(); drift(sp.pan, CHOIR_PAN[i] * 0.6, 0.5);
       lfo.connect(lg); lg.connect(g.gain); g.connect(phrase); phrase.connect(sp); sp.connect(nasal);
       const oscs = [];
       for (const cents of [-6, 0, 5]) {                                                      // a few singers on one note
@@ -651,7 +660,7 @@
       const f = ROOT * snap(ratio, CHORDS[chord].tones, false);
       const g = ac.createGain(); g.gain.value = 0;
       const body = ac.createBiquadFilter(); body.type = 'lowpass'; body.frequency.value = 2400; body.Q.value = 0.3;
-      const sp = ac.createStereoPanner(); sp.pan.value = STRING_PAN[i];
+      const sp = ac.createStereoPanner(); drift(sp.pan, STRING_PAN[i] * 0.7, 0.4);
       g.connect(body); body.connect(sp); sp.connect(filter);
       const oscs = [];
       for (const cents of [-8, 0, 7]) {
@@ -839,7 +848,7 @@
     if (!graph || now - lastTick < 100) return;
     lastTick = now;
     const t = actx.currentTime;
-    graph.pan.pan.setTargetAtTime(0.3 * Math.cos(vis.phi), t, 0.5);
+    graph.pan.pan.setTargetAtTime(0.1 * Math.cos(vis.phi), t, 0.5);   // a hint of the bright side; the layers do the moving
     graph.swell.gain.setTargetAtTime(1 + 0.9 * Math.min(1, vis.hot), t, 0.7);
   }
   function ramp(to, secs) {

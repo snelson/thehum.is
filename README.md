@@ -20,7 +20,8 @@ choir. The chord walks slowly between neighbours on the same root (open fifth,
 major, sus, minor, sevenths, neutral third; brief clusters that always
 resolve) on uneven timing: holds and glide speeds vary, and each voice
 glides on its own clock. Now and then one tone blooms into vibrato. Every minute or two a string section
-swells in an octave over the choir and fades away. It
+swells in an octave over the choir and fades away. Root and fifth hold the centre; the upper
+layers drift across the stereo field on slow paths of their own. It
 follows the ring: it leans toward the bright side and swells with hot spots.
 While it plays, the void, ring
 and sound breathe together on the year tone slowed 10 more octaves (one
