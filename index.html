@@ -819,6 +819,12 @@
     const g = graph.master.gain, t = actx.currentTime;
     g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(to, t + secs);
   }
+  // Coming in: a slow, curved rise (x³) — near-silent at first, so the hum arrives rather than switches on.
+  function fadeIn(to, secs) {
+    const g = graph.master.gain, t = actx.currentTime, from = g.value;
+    const curve = new Float32Array(64).map((_, i) => from + (to - from) * Math.pow(i / 63, 3));
+    g.cancelScheduledValues(t); g.setValueCurveAtTime(curve, t, secs);
+  }
 
   // iOS: claim the playback channel and keep a silent track looping, or the mute switch wins.
   function unmute() {
@@ -845,7 +851,7 @@
     actx.resume().catch(() => {});
     clearTimeout(tearDown);
     if (!graph) { build(); scheduleDetune(); scheduleGlide(); scheduleColour(); scheduleBreath(); scheduleVibrato(); scheduleStrings(); }
-    ramp(LEVEL, 4);
+    fadeIn(LEVEL, 10);
     if (debug) window.__hum = { ctx: actx, master: graph.master, graph };
   }
   function disable() {
