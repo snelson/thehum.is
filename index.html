@@ -297,7 +297,7 @@
         .forEach(([s, col]) => ringGrad.addColorStop(s, col));
     } else ringGrad = RING;
 
-    const target = W < 700 ? 190 : 420;
+    const target = W < 700 ? 130 : 300;   // tuned so the steady state matches the opening sky
     while (points.length < target) points.push(spawn(true));
     points.length = target;
   }
@@ -311,8 +311,10 @@
     if (W < H && Math.random() < 0.7) a = (Math.random() < 0.5 ? -1 : 1) * Math.PI / 2 + (Math.random() - 0.5) * 1.2;
     const p = {
       a,
-      rad: initial ? r + 6 + Math.random() * (maxR * 1.6 - r - 6) : maxR * (1.4 + Math.random() * 0.4),
-      born: maxR * (1.4 + Math.random() * 0.4),
+      // Born just past the screen's corners, so the sky refills as fast as it drains
+      // (born far out, a point took over a minute to arrive and the field thinned).
+      rad: initial ? r + 6 + Math.random() * (maxR * 1.1 - r - 6) : maxR * (1.0 + Math.random() * 0.1),
+      born: maxR * (1.0 + Math.random() * 0.1),
       w: spin * (2 + (Math.random() - 0.5) * 1.2) * Math.PI / 180,
       size: 0.9 + Math.random() * 1.1
     };
