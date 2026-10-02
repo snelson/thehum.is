@@ -652,16 +652,35 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// Leaving through a door (studio, works): let the hum fall away before the next page. New-tab clicks go straight through.
-const LEAVE_FADE = 0.6;
-document.querySelectorAll('.ways a').forEach((a) => a.addEventListener('click', (e) => {
-  if (!graph || !on || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-  e.preventDefault();
-  ramp(0, LEAVE_FADE);
-  setTimeout(() => { location.href = a.href; }, LEAVE_FADE * 1000 + 50);
-}));
+// Leaving through a door (studio, works): the hum falls away over the dive (the entrance runs it).
+function leaveFade(secs) { if (graph && on) ramp(0, secs); }
+// And the whole hum falls with it: the shared key offset under every pitch (the tap tones' too) glides down
+// DIVE_FALL cents over the whole dive and the hang after it, starting at once and sinking on (an exponential
+// approach, a quarter of the span per step), so the deepest flutter and pulses land in the hang. Its level
+// holds at full through the visual dive, so the fall is heard, then drops away over the hang (diveFade).
+// Any key lean in flight is stopped where it is first.
+const DIVE_FALL = 6000;   // five octaves: through flutter into slow pulses
+let keyBefore = null;
+function diveFade(hold, fade) {   // s: full for `hold`, then away over `fade`
+  if (!graph || !on) return;
+  const g = graph.master.gain, t = actx.currentTime;
+  freeze(g, t); const from = g.value;
+  // Over the hang: stay present while the pulses sound, then let go late (1 - x³), ending at silence.
+  const curve = new Float32Array(64).map((_, i) => from * (1 - Math.pow(i / 63, 3)));
+  g.setValueCurveAtTime(curve, t + hold, fade);   // no event at t + hold: a curve may not share its start
+}
+function diveFall(secs) {
+  if (!graph || !on) return;
+  const p = graph.key.offset, t = actx.currentTime;
+  freeze(p, t); keyBefore = p.value;
+  p.setTargetAtTime(keyBefore - DIVE_FALL, t, secs / 4);
+}
 // Back from a link: the page can return from the back-forward cache with the hum faded out.
 addEventListener('pageshow', (e) => {
+  if (e.persisted && graph && keyBefore !== null) {   // back from a dive: the key where it was, before the hum comes back
+    const p = graph.key.offset, t = actx.currentTime;
+    p.cancelScheduledValues(t); p.setValueAtTime(keyBefore, t); keyBefore = null;
+  }
   if (e.persisted && graph && on) actx.resume().then(() => { if (graph && on) ramp(LEVEL, 1.5); }).catch(() => {});
 });
 
@@ -669,5 +688,5 @@ addEventListener('pageshow', (e) => {
 export function setAimTuneIn(v) { aimTuneIn = v; }
 
 export {
-  btn, on, graph, tearDown, destroy, tapTone, tapRedshift, tapRelease, TAP_CROSS, humTick,
+  btn, on, graph, tearDown, destroy, tapTone, leaveFade, diveFall, diveFade, tapRedshift, tapRelease, TAP_CROSS, humTick,
 };

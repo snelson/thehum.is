@@ -43,6 +43,8 @@
     --draw-in-ease: cubic-bezier(0.32, 0, 0.67, 0);
     --draw-in-fade: var(--draw-in-ease);
     --draw-in-time: 1.1s;
+    --dive-time: 1.1s;   /* leaving through a door: the script's DIVE_MS */
+    --dive-ease: cubic-bezier(0.7, 0, 0.84, 0);   /* the script's DIVE_EASE (easeInExpo) */
     /* The name's return: how far it rises into place and over how long (the fade lands a little sooner). */
     --head-rise: 28px;
     --head-rise-time: 1.8s;
@@ -369,6 +371,48 @@
     .leaving .ways .way-works { transform: translate(calc(-1 * var(--inward)), -50%) scale(0.2); }
   }
   .mark-in .verse-reset, .mark-in .ways a { transition: opacity 1.5s ease; }
+  /* Leaving through a door: the verse is drawn inward on the draw-in's ease, the doors fly outward,
+     the name and the end mark fade, over --dive-time (the script's DIVE_MS) while the void opens past the
+     screen. Reduced motion: a quick fade to dark. */
+  .diving .verse-wrap {
+    opacity: 0; transform: scale(0.2); transform-origin: 50% 50vh;
+    transition: transform var(--dive-time) var(--dive-ease), opacity var(--dive-time) var(--draw-in-fade);
+  }
+  .diving .head, .diving.pacing.landed .head, .diving .verse-reset { opacity: 0; transition: opacity calc(var(--dive-time) * 0.6) ease; }
+  .ways { --outward: 45vw; }
+  .diving .ways a {
+    opacity: 0;
+    transition: transform var(--dive-time) var(--dive-ease), opacity var(--dive-time) var(--draw-in-fade);
+  }
+  .diving .ways .way-studio { transform: translate(calc(-50% - var(--outward)), -50%) scale(1.6); }
+  .diving .ways .way-works { transform: translate(calc(-50% + var(--outward)), -50%) scale(1.6); }
+  /* The click answers at once, under the dive: the chosen door snaps bright (--chosen-snap) and holds a
+     moment before it fades on the way out, its caret jumping out (--chosen-jump); the other door goes
+     quickly (--other-fade). */
+  .ways { --chosen-snap: 0.1s; --chosen-jump: 6px; --other-fade: 0.25s; }
+  .diving .ways a.chosen {
+    color: var(--ink);
+    animation: chosen var(--dive-time) linear both;
+    transition: transform var(--dive-time) var(--dive-ease), color var(--chosen-snap) ease-out;
+  }
+  @keyframes chosen { 0% { opacity: 0.85; } 9% { opacity: 1; } 55% { opacity: 0.9; } 100% { opacity: 0; } }
+  .diving .ways a.chosen .way-arrow { opacity: 1; transition: transform var(--chosen-snap) ease-out, opacity var(--chosen-snap) ease-out; }
+  .diving .ways .way-studio.chosen .way-arrow { transform: translateX(calc(-1 * var(--chosen-jump))); }
+  .diving .ways .way-works.chosen .way-arrow { transform: translateX(var(--chosen-jump)); }
+  .diving .ways a:not(.chosen) { transition: transform var(--dive-time) var(--dive-ease), opacity var(--other-fade) ease-out; }
+  @media (max-width: 700px) {
+    .diving .ways .way-studio { transform: translate(calc(-1 * var(--outward)), -50%) scale(1.6); }
+    .diving .ways .way-works { transform: translate(var(--outward), -50%) scale(1.6); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .diving .verse-wrap, .diving .head, .diving .verse-reset, .diving .ways a { transform: none; transition: opacity 0.3s ease; }
+    .diving .ways a.chosen { animation: none; opacity: 1; transition: none; }   /* an instant brightening, no jump */
+    .diving .ways .way-studio.chosen .way-arrow, .diving .ways .way-works.chosen .way-arrow { transform: none; transition: none; }
+    @media (min-width: 701px) { .diving .ways .way-studio, .diving .ways .way-works { transform: translate(-50%, -50%); } }
+    @media (max-width: 700px) { .diving .ways .way-studio, .diving .ways .way-works { transform: translateY(-50%); } }
+    .diving .stage { transition: opacity 0.3s ease; }
+    .diving.dark .stage { opacity: 0; }
+  }
   @media (prefers-reduced-motion: reduce) {
     .ways a, .mark-in .ways a, .leaving .ways a { transition: none; }
     .leaving .ways .way-studio, .leaving .ways .way-works { transform: none; }

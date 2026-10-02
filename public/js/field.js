@@ -140,7 +140,7 @@ const tintAt = f => mix(rgba0(mix(RING, TEAL, 0.5 * near(f, 0.1667, 0.035))), MA
 // Accretion light is clumpy: brightness churns along the ring (three drifting waves at
 // incommensurate speeds) and hot spots flare, orbit and fade. Beaming still favours one side.
 const spots = [];
-const vis = { phi: 0, hot: 0, lift: 0 };   // ring state shared with the sound, written once per frame in drawRing; lift: the door's hover
+const vis = { phi: 0, hot: 0, lift: 0, flare: 0 };   // ring state shared with the sound, written once per frame in drawRing; lift: the door's hover
 function newSpot(t) {
   return { th: Math.random() * TAU, w: spin * (0.12 + Math.random() * 0.25), born: t,
            life: 4 + Math.random() * 7, sig: 0.09 + Math.random() * 0.1, peak: 0.35 + Math.random() * 0.35 };
@@ -175,13 +175,14 @@ function drawRing(alpha, now) {
   const bs = [];
   for (let i = 0; i < STOPS; i++) bs.push(brightness((i / STOPS) * TAU, t, phi));
   const pz = vis.pulse ? vis.pulse() : 0;   // the hum's slow pulse, 0–1; 0 when silent
-  const lift = 1 + LIFT * vis.lift;          // the door, hovered or focused: the whole ring a little brighter
+  const lift = (1 + LIFT * vis.lift) * (1 + FLARE * vis.flare);   // the door, hovered or focused, or clicked (the flare): the whole ring brighter
   const k = (1 + 0.7 * pz) * lift;
   ctx.save();
   ctx.globalAlpha = alpha;
   const g0 = glow.s * r / r0;   // the glow was drawn for r0; follow the breathing edge
   ctx.drawImage(glow.c, cx - g0 / 2, cy - g0 / 2, g0, g0);
   if (vis.lift > 0.001) { ctx.globalAlpha = alpha * LIFT * vis.lift; ctx.drawImage(glow.c, cx - g0 / 2, cy - g0 / 2, g0, g0); ctx.globalAlpha = alpha; }
+  if (vis.flare > 0.001) { ctx.globalAlpha = Math.min(1, alpha * FLARE * vis.flare); ctx.drawImage(glow.c, cx - g0 / 2, cy - g0 / 2, g0, g0); ctx.globalAlpha = alpha; }
   if (pz > 0.01) {
     // Brighter on the swell, never bigger: the glow's inner edge must stay on the horizon.
     ctx.globalAlpha = alpha * 0.6 * pz; ctx.drawImage(glow.c, cx - g0 / 2, cy - g0 / 2, g0, g0); ctx.globalAlpha = alpha;
@@ -293,6 +294,11 @@ function frame(now) {
   const lt = liftOn && html.classList.contains('entering') ? 1 : 0;
   const tau = lt > vis.lift ? 0.17 : html.classList.contains('entering') ? 0.27 : 0.08;
   vis.lift += (lt - vis.lift) * (1 - Math.exp(-dt / tau)); if (vis.lift < 0.001) vis.lift = 0;
+  if (flareAt) {   // the flare: up over FLARE_RISE ms, then away over FLARE_DECAY ms
+    const ft = now - flareAt;
+    vis.flare = ft < FLARE_RISE ? ft / FLARE_RISE : Math.exp(-(ft - FLARE_RISE) / FLARE_DECAY);
+    if (vis.flare < 0.001) { vis.flare = 0; flareAt = 0; }
+  }
   if (flow) { flowY = flow.at(clock, dt); verseEl.style.transform = `translateY(${flowY.toFixed(2)}px)`; }
   step(dt);
   settleDent(dt);
@@ -308,6 +314,11 @@ function drawStatic() { ctx.clearRect(0, 0, W, H); drawRing(0.9, BEAM_PERIOD * 0
 // The door, hovered, focused from the keyboard, or pressed: the ring lifts a little (LIFT, ~20%).
 // Reduced motion: at once, no ease. Only at the door; the entrance lets it go.
 const LIFT = 0.2, html = document.documentElement;
+// A door clicked: the ring flares, stronger and quicker than the lift (FLARE extra brightness, rising over
+// FLARE_RISE ms and falling away over FLARE_DECAY ms into the dive). Not under reduced motion.
+const FLARE = 0.9, FLARE_RISE = 80, FLARE_DECAY = 500;
+let flareAt = 0;
+function flare() { if (!reduced) flareAt = performance.now(); }
 let liftOn = false;
 function lifted(on) {
   liftOn = on && html.classList.contains('entering');
@@ -338,6 +349,7 @@ if (reduced) {
 export const sound = { humTick() {}, tapRedshift() {}, tapRelease() {}, TAP_CROSS: 0 };
 // For the entrance, which can't assign another module's bindings: clear the cues, set the verse's flow.
 export function clearCues() { cues = []; }
+export { flare };
 export function setFlow(f, y) { flow = f; if (y !== undefined) flowY = y; }
 const snapTo = (a) => { aperture = a; voidEl.style.transform = a < 1 ? `translate(-50%, -50%) scale(${a.toFixed(4)})` : ''; layout(); drawStatic(); };
 
