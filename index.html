@@ -642,15 +642,31 @@
   const rgba0 = c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
 
   let last = 0, t0 = performance.now(), raf = 0;
+  // The entrance's own clock (ms). It runs with the frames, so it stops while the page is hidden or frozen
+  // and goes on from there when it's back; one frame never moves it more than CLOCK_STEP, so nothing that
+  // fell due while the page was away arrives at once. The swings, the verse's drift and its cues read it.
+  const CLOCK_STEP = 250;
+  let clock = 1, cues = [];
+  const cue = (fn, ms) => cues.push({ fn, at: clock + ms });
+  function runCues() {   // due ones, earliest first; a cue may add cues or clear them all
+    for (;;) {
+      let k = -1;
+      cues.forEach((c, i) => { if (c.at <= clock && (k < 0 || c.at < cues[k].at)) k = i; });
+      if (k < 0) return;
+      cues.splice(k, 1)[0].fn();
+    }
+  }
   const verseEl = document.querySelector('.verse');
   let flow = null, flowY = 0;   // the verse's vertical offset while the entrance runs (see the entrance); null: in place
   function frame(now) {
-    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
+    const ms = now - last, dt = Math.max(0, Math.min(0.05, ms / 1000)); last = now;
+    clock += Math.max(0, Math.min(CLOCK_STEP, ms));
+    runCues();
     ctx.clearRect(0, 0, W, H);
     // The void breathes with the hum: up to 4.5% wider on each swell, back on the ebb.
     // Opening, growing with the verse, or closing: along the current swing's curve.
-    if (apAt && now >= apAt) {
-      const p = Math.min(1, (now - apAt) / apMs);
+    if (apAt && clock >= apAt) {
+      const p = Math.min(1, (clock - apAt) / apMs);
       aperture = apFrom + (apTo - apFrom) * apEase(p);
       if (p === 1) { apAt = 0; lastScale = -1; }   // land exactly
     }
@@ -661,7 +677,7 @@
     const lt = liftOn && html.classList.contains('entering') ? 1 : 0;
     const tau = lt > vis.lift ? 0.17 : html.classList.contains('entering') ? 0.27 : 0.08;
     vis.lift += (lt - vis.lift) * (1 - Math.exp(-dt / tau)); if (vis.lift < 0.001) vis.lift = 0;
-    if (flow) { flowY = flow.at(now, dt); verseEl.style.transform = `translateY(${flowY.toFixed(2)}px)`; }
+    if (flow) { flowY = flow.at(clock, dt); verseEl.style.transform = `translateY(${flowY.toFixed(2)}px)`; }
     step(dt);
     settleDent(dt);
     drawPoints();
@@ -1368,7 +1384,7 @@
   // "Nothing." with room, steady through the middle, a soft settle; it stays ahead of the opening rows.
   const GROW_EASE = bezier(0.2, 0.25, 0.6, 1);
   const SKIP_MS = 800, SKIP_EASE = bezier(0.42, 0, 0.58, 1);   // a skip: the rows' ease-in-out
-  let paceTimers = [], armed = false, swallow = false, swallowTimer = 0, refocus = false;
+  let armed = false, swallow = false, swallowTimer = 0, refocus = false;
   // While pacing, each line is letters for the eye (aria-hidden) and its whole text for the ear.
   // Measured once, at the start: the line's width and how far each letter reaches, so the
   // letters can sit where they end up and slide by half of what's still to come.
@@ -1394,7 +1410,7 @@
     const { ink, chs, ends, w, text } = streams[n];
     let t = 0;
     chs.forEach((ch, i) => {
-      paceTimers.push(setTimeout(() => { ch.classList.add('on'); ink.style.transform = `translateX(${(w - ends[i]) / 2}px)`; }, t));
+      cue(() => { ch.classList.add('on'); ink.style.transform = `translateX(${(w - ends[i]) / 2}px)`; }, t);
       t += beat(text[i], n);
     });
   }
@@ -1438,7 +1454,7 @@
     const from = flowY, ap0 = aperture;
     return { at() { const f = apTo === ap0 ? 1 : Math.min(1, Math.max(0, (aperture - ap0) / (apTo - ap0))); return from + (to - from) * f; } };
   }
-  function halt() { paceTimers.forEach(clearTimeout); paceTimers = []; armed = false; }
+  function halt() { cues = []; armed = false; }
   function unpace() {
     halt();
     root.classList.remove('pacing', 'skipped', 'landed');
@@ -1465,19 +1481,22 @@
     const end = landing();
     root.classList.add('pacing');
     split();   // after .pacing, so the letters are born hidden (no fade-out from a first, plain style)
-    flow = follow(performance.now(), end);
-    swing(1, performance.now(), end * 1000, GROW_EASE);
+    flow = follow(clock, end);
+    swing(1, clock, end * 1000, GROW_EASE);
     let at = 0;
     lines.forEach((l, i) => {
       at += PACE[i] || 0;
-      paceTimers.push(setTimeout(() => { armed = true; stream(i); }, at * 1000));
+      cue(() => { armed = true; stream(i); }, at * 1000);
     });
     const landed = Math.max(end, at + lastLetter(lines.length - 1) + 0.4), named = landed + HEAD_PAUSE;
-    paceTimers.push(setTimeout(land, named * 1000));
-    root.classList.add('quiet-mark'); markLater(named + HEAD_RISE + MARK_AFTER);
-    paceTimers.push(setTimeout(unpace, (named + HEAD_RISE + 0.2) * 1000));
+    cue(land, named * 1000);
+    root.classList.add('quiet-mark');
+    cue(() => { unpace(); markLater(MARK_AFTER - 0.2); }, (named + HEAD_RISE + 0.2) * 1000);
   }
-  // Never trap a reader: once the first line is up, a tap, scroll, wheel or key shows the rest.
+  // Never trap a reader: once the first line is up, a tap, a wheel or a key shows the rest. Only what the
+  // visitor does counts: not a modifier on its own or a shortcut (Cmd-Tab away), not a trackpad's momentum
+  // from a flick made before the first line, not a scroll (a touch that scrolls starts with a tap; the
+  // page also scrolls when a phone turns or its toolbar folds).
   function skip() {
     if (!armed) return false;
     armed = false;
@@ -1489,8 +1508,8 @@
     }
     flow = tie(0, 1);
     markLater(SKIP_MS / 1000 + MARK_AFTER);   // the name rises over the skip's 0.8 s (CSS), then the mark
-    land(); swing(1, performance.now(), SKIP_MS, SKIP_EASE);   // with the void to full and the name back
-    paceTimers = [setTimeout(unpace, FADE * 1000)];   // lets any line mid-fade finish its own
+    land(); swing(1, clock, SKIP_MS, SKIP_EASE);   // with the void to full and the name back
+    cue(unpace, FADE * 1000);   // lets any line mid-fade finish its own
     return true;
   }
   // The tap that skips is spent on it: it doesn't also flip the hum or follow a link. Same for
@@ -1501,12 +1520,21 @@
   }, true);
   addEventListener('pointercancel', () => { swallow = false; }, true);
   addEventListener('click', (e) => { if (swallow && e.isTrusted) { swallow = false; e.preventDefault(); e.stopPropagation(); } }, true);
+  const SHORTCUT = /^(Shift|Control|Alt|AltGraph|Meta|OS|Super|Hyper|CapsLock|Fn|FnLock|NumLock|ScrollLock|Symbol|SymbolLock)$/;
   addEventListener('keydown', (e) => {
+    if (SHORTCUT.test(e.key) || e.metaKey || e.ctrlKey || e.altKey) return;
     if (document.activeElement === reset || !skip()) return;
     if (e.key === 'Enter' || e.key === ' ') e.preventDefault();
   }, true);
-  addEventListener('wheel', skip, { passive: true });
-  addEventListener('scroll', skip, { passive: true });
+  // A wheel gesture is a run of events less than WHEEL_GAP ms apart; one begun before the first line is
+  // up never skips, however long its momentum lasts. Events with no travel don't count.
+  const WHEEL_GAP = 300;
+  let wheelAt = -Infinity, wheelEarly = false;
+  addEventListener('wheel', (e) => {
+    if (e.timeStamp - wheelAt > WHEEL_GAP) wheelEarly = !armed;
+    wheelAt = e.timeStamp;
+    if (!wheelEarly && (e.deltaX || e.deltaY)) skip();
+  }, { passive: true });
   // A tap in the field, once entered (during the entrance a tap skips; at the door nothing new): a point
   // where it landed, and, with the hum on, its tone. Taps on the name, links, the end mark or any button
   // behave as before. Outside the ring only.
@@ -1575,8 +1603,8 @@
     };
     if (reduced) setTimeout(door_, 600);
     else {
-      swing(SHUT, performance.now() + DRAWIN_LEAD * 1000, CLOSE_MS, expoInOut);
-      setTimeout(door_, DRAWIN_LEAD * 1000 + CLOSE_MS);   // as the void lands
+      swing(SHUT, clock + DRAWIN_LEAD * 1000, CLOSE_MS, expoInOut);
+      cue(door_, DRAWIN_LEAD * 1000 + CLOSE_MS);   // as the void lands
     }
   }
   door.querySelector('.door-in').addEventListener('click', () => enter(true));
