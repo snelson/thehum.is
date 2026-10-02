@@ -654,11 +654,11 @@ document.addEventListener('visibilitychange', () => {
 
 // Leaving through a door (studio, works): the hum falls away over the dive (the entrance runs it).
 function leaveFade(secs) { if (graph && on) ramp(0, secs); }
-// And the whole hum falls with it: the shared key offset under every pitch (the tap tones' too) glides down
-// DIVE_FALL cents over the whole dive and the hang after it, starting at once and sinking on (an exponential
-// approach, a quarter of the span per step), so the deepest flutter and pulses land in the hang. Its level
-// holds at full through the visual dive, so the fall is heard, then drops away over the hang (diveFade).
-// Any key lean in flight is stopped where it is first.
+// And the whole hum falls with it: the shared key offset under every pitch (the tap tones' too) falls
+// DIVE_FALL cents over the dive and the hang after it: eased in over the visual dive (exponential), a slow
+// bend that gathers into the drop, halfway down as the void fills the screen; then eased out over the hang
+// (cubic), a long settle into the deepest flutter and pulses while the level drops away (diveFade). Any key
+// lean in flight is stopped where it is first.
 const DIVE_FALL = 6000;   // five octaves: through flutter into slow pulses
 let keyBefore = null;
 function diveFade(hold, fade) {   // s: full for `hold`, then away over `fade`
@@ -669,14 +669,52 @@ function diveFade(hold, fade) {   // s: full for `hold`, then away over `fade`
   const curve = new Float32Array(64).map((_, i) => from * (1 - Math.pow(i / 63, 3)));
   g.setValueCurveAtTime(curve, t + hold, fade);   // no event at t + hold: a curve may not share its start
 }
-function diveFall(secs) {
+function diveFall(dive, hang) {   // s: the fall's ease-in, then its ease-out
   if (!graph || !on) return;
-  const p = graph.key.offset, t = actx.currentTime;
+  const p = graph.key.offset, t = actx.currentTime, k = dive / (dive + hang);
   freeze(p, t); keyBefore = p.value;
-  p.setTargetAtTime(keyBefore - DIVE_FALL, t, secs / 4);
+  const ease = (x) => (x < k ? 0.5 * (2 ** (10 * x / k) - 1) / 1023 : 0.5 + 0.5 * (1 - (1 - (x - k) / (1 - k)) ** 3));
+  const curve = new Float32Array(256).map((_, i) => keyBefore - DIVE_FALL * ease(i / 255));
+  p.setValueCurveAtTime(curve, t + 0.005, dive + hang);   // just after the hold: a curve may not share its start
+  pulses(dive + hang, ease);
+}
+// And as it falls the chord turns to rhythm, as in the studio's rhythm-into-pitch: under each main voice a
+// sawtooth (its jump, the click, at phase 0, so they all start on one click) at the same pitch, on the same
+// key, falling with it. Silent at first, it comes up as the fall passes PULSE_IN and is full by PULSE_FULL
+// (fractions of the way down), so it takes over as the soft voices sink below hearing: buzz, then flutter,
+// then pulses, the chord's ratios now polyrhythms (the fifth, three against two). Highpassed above PULSE_HP
+// so only the clicks are left, not the slow ramps between them, and lowpassed under PULSE_LP so they land
+// soft rather than crackle. Straight to the output, so the hum's fade
+// doesn't take them: the pulses are the last thing heard, and they stop dead with the page.
+const PULSE_GAIN = 0.05, PULSE_IN = 0.2, PULSE_FULL = 0.6, PULSE_HP = 60, PULSE_LP = 2500;
+let pulseOut = null;   // so a return from the back-forward cache can cut them
+function pulses(secs, ease) {
+  const ac = actx, t = ac.currentTime + 0.005;
+  const N = 4096, re = new Float32Array(N), im = new Float32Array(N);
+  for (let k = 1; k < N; k++) im[k] = 1 / k;
+  const wave = ac.createPeriodicWave(re, im);
+  const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = PULSE_HP; hp.Q.value = 0.5;
+  const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = PULSE_LP; lp.Q.value = 0.5;
+  const g = ac.createGain();
+  g.gain.setValueCurveAtTime(new Float32Array(128).map((_, i) => {
+    const x = Math.min(1, Math.max(0, (ease(i / 127) - PULSE_IN) / (PULSE_FULL - PULSE_IN)));
+    return PULSE_GAIN * x * x * (3 - 2 * x);
+  }), t, secs);
+  hp.connect(lp); lp.connect(g); g.connect(ac.destination); pulseOut = g;
+  const oscs = graph.voices.map((v) => {
+    const o = ac.createOscillator(); o.setPeriodicWave(wave); o.frequency.value = v.osc.frequency.value;
+    graph.key.connect(o.detune); o.connect(hp);
+    o.start(t); o.stop(t + secs + 0.05);
+    return o;
+  });
+  oscs[0].onended = () => {
+    oscs.forEach((o) => { try { graph.key.disconnect(o.detune); } catch (e) {} });
+    g.disconnect(); if (pulseOut === g) pulseOut = null;
+  };
 }
 // Back from a link: the page can return from the back-forward cache with the hum faded out.
 addEventListener('pageshow', (e) => {
+  if (e.persisted && pulseOut) { pulseOut.disconnect(); pulseOut = null; }   // the dive's pulses, cut
   if (e.persisted && graph && keyBefore !== null) {   // back from a dive: the key where it was, before the hum comes back
     const p = graph.key.offset, t = actx.currentTime;
     p.cancelScheduledValues(t); p.setValueAtTime(keyBefore, t); keyBefore = null;

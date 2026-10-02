@@ -275,7 +275,7 @@ reset.addEventListener('click', leave);
 const DIVE_MS = 1100, DIVE_REACH = 1.15, DIVE_DARK = 350, DIVE_EASE = bezier(0.7, 0, 0.84, 0);   // easeInExpo: a slow lean, then the fall
 // Then a hang in the void before the next page (DIVE_HANG ms; DIVE_HANG_REDUCED under reduced motion), the
 // field still turning, while the hum's fall reaches its depths and fades.
-const DIVE_HANG = 700, DIVE_HANG_REDUCED = 250;
+const DIVE_HANG = 1100, DIVE_HANG_REDUCED = 250;
 let diving = false;
 function go(href) {
   if (location.hash === '#humdebug' && window.__holdNav) { window.__navs = (window.__navs || 0) + 1; window.__navTo = href; window.__navAt = performance.now(); return; }
@@ -288,7 +288,7 @@ document.querySelectorAll('.ways a').forEach((a) => a.addEventListener('click', 
   diving = true;
   const secs = reduced ? DIVE_DARK : DIVE_MS, hang = reduced ? DIVE_HANG_REDUCED : DIVE_HANG;
   a.classList.add('chosen');   // at once: the door brightens, its caret jumps out, the other door goes (CSS)
-  flare(); diveFall((secs + hang) / 1000);
+  flare(); diveFall(secs / 1000, hang / 1000);
   diveFade(secs / 1000, hang / 1000);
   root.classList.add('diving');
   if (reduced) root.classList.add('dark');
