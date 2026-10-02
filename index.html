@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="description" content="Nothing. Something. No thing, some thing. The original beat. Became sound. Light. Form.">
+<meta name="description" content="Nothing. Something. No thing, some thing. The original beat. Became sound. Color. Form.">
 <meta name="theme-color" content="#0b0a14">
 <link rel="canonical" href="https://thehum.is/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -16,7 +16,7 @@
 <script>try { if (!localStorage.getItem('hum.entered') && !localStorage.getItem('hum.heard')) document.documentElement.classList.add('entering'); } catch (e) {}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;1,6..72,300&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..400;1,6..72,300&display=swap" rel="stylesheet">
 <style>
   /* One dark theme, on purpose. The sister page radiates; this one draws in. */
   :root {
@@ -32,8 +32,8 @@
        ring reads as a horizon, not a badge. Cap keeps the verse inside. */
     --d: 560px;
     --inscription-size: 11px;
-    --verse-size: 20px;
-    --verse-lh: 1.55;
+    --verse-size: 22px;
+    --verse-lh: 1.6;
     --verse-w: min(80vw, 420px);
     --footer-h: 44px;
     --footer-gap: 28px;
@@ -50,8 +50,8 @@
     :root {
       --d: clamp(560px, 150vw, 720px);
       --inscription-size: 10px;
-      --verse-size: 17px;
-      --verse-lh: 1.5;
+      --verse-size: 18px;
+      --verse-lh: 1.55;
       --verse-w: 80vw;
     }
   }
@@ -270,13 +270,13 @@
     margin: 0;
     text-align: center;
     font-family: "Newsreader", Georgia, "Times New Roman", serif;
-    font-weight: 300;
+    font-weight: 340;   /* light text on the dark reads thinner than it is */
     font-size: var(--verse-size);
     line-height: var(--verse-lh);
-    color: var(--ink);
+    color: rgb(230 226 240 / 0.88);   /* --ink, held back so it glows from inside the void */
   }
   .verse p { margin: 0; }
-  .verse p + p { margin-top: calc(var(--verse-size) * var(--verse-lh)); }
+  .verse p + p { margin-top: calc(var(--verse-size) * var(--verse-lh) * 1.25); }   /* a breath, not a skipped line */
   .verse p > span {
     display: block;
     text-wrap: balance;
@@ -320,7 +320,7 @@
   .verse { position: relative; }
   .verse-reset {
     appearance: none; -webkit-appearance: none; background: none; border: 0; margin: 0; padding: 0;
-    position: absolute; left: 50%; top: calc(100% + var(--verse-size) * var(--verse-lh) - 17px); transform: translateX(-50%);
+    position: absolute; left: 50%; top: calc(100% + var(--verse-size) * var(--verse-lh) * 0.7 - 17px); transform: translateX(-50%);
     width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
     color: var(--ink-dim); opacity: 0.38; cursor: pointer;
     -webkit-tap-highlight-color: transparent; touch-action: manipulation;
@@ -364,7 +364,7 @@
       <span><span>No thing, some thing.</span></span>
       <span><span>The original beat.</span></span>
       <span><span>Became sound.</span></span>
-      <span><span>Light.</span></span>
+      <span><span>Color.</span></span>
       <span><span>Form.</span></span>
     </p>
     <p>
@@ -1213,13 +1213,13 @@
     1.5,   // Something.
     1.7,   // No thing, some thing.             a little room
     2.2,   // The original beat.                its own breath (room after the long comma above)
-    1.3,   // Became sound.                     close behind: one sentence across the break
-    1.8,   // Light.                            held
+    2.1,   // Became sound.                     a held beat after the origin, then the change
+    1.8,   // Color.                            held
     1.9,   // Form.                             held
     2.6,   // Everything is this.               held after "Form.", a breath at the stanza break
     1.8,   // Still enough to hear              its own breath
     1.4,   // that it becomes                   close behind: one sentence across the lines
-    2.6,   // through us.                       held: the arrival (~22 s)
+    2.6,   // through us.                       held: the arrival (~23 s)
   ];
   // A comma's beat inside a line, where it differs from COMMA_MS (ms, by line index). Tune by ear.
   const COMMA_BEAT = {
