@@ -602,8 +602,9 @@
     // Soft partials; sines read as sub on small speakers.
     const pw = ac.createPeriodicWave(new Float32Array([0, 0, 0, 0, 0]), new Float32Array([0, 1, 0.16, 0.05, 0.015]));
     const swell = ac.createGain(); swell.gain.value = 1; swell.connect(filter);
+    const tune = () => Math.pow(2, Math.random() * 2 - 1);   // tuning in: each tone starts up to an octave off
     const voices = MAIN_R0.map((r0, i) => {
-      const osc = ac.createOscillator(); osc.setPeriodicWave(pw); osc.frequency.value = ROOT * snap(r0, CHORDS[chord].tones, i === 0);
+      const osc = ac.createOscillator(); osc.setPeriodicWave(pw); osc.frequency.value = ROOT * snap(r0, CHORDS[chord].tones, i === 0) * tune();
       const g = ac.createGain(); g.gain.value = VOICE_GAIN[i] * 0.65;
       const lfo = ac.createOscillator(); lfo.frequency.value = 1 / LFO_PERIODS[i];
       const lg = ac.createGain(); lg.gain.value = VOICE_GAIN[i] * 0.35;
@@ -615,7 +616,7 @@
       return { osc, g, vib: vibrato([osc.detune]), kind: 'main' };
     });
     const upper = UPPER.map((ratio, i) => {
-      const osc = ac.createOscillator(); osc.type = 'sine'; osc.frequency.value = ROOT * snap(ratio, CHORDS[chord].tones, false);
+      const osc = ac.createOscillator(); osc.type = 'sine'; osc.frequency.value = ROOT * snap(ratio, CHORDS[chord].tones, false) * tune();
       const g = ac.createGain(); g.gain.value = UPPER_GAIN[i] * 0.8;   // swells 60–100%: the drone holds
       const lfo = ac.createOscillator(); lfo.frequency.value = 1 / UPPER_PERIODS[i];
       const lg = ac.createGain(); lg.gain.value = UPPER_GAIN[i] * 0.2;
@@ -654,10 +655,10 @@
       const trem = ac.createGain(); trem.gain.value = 1;                                     // rhythm pulses
       const sp = ac.createStereoPanner(); drift(sp.pan, CHOIR_PAN[i] * 0.6, 0.5);
       lfo.connect(lg); lg.connect(g.gain); g.connect(phrase); phrase.connect(trem); trem.connect(sp); sp.connect(nasal);
-      const oscs = [];
+      const oscs = [], k = tune();                                                          // one person: one starting pitch
       for (const cents of [-6, 0, 5]) {                                                      // a few singers on one note
         const osc = ac.createOscillator(); osc.setPeriodicWave(vox);
-        osc.frequency.value = ROOT * snap(ratio, CHORDS[chord].tones, false); osc.detune.value = cents;
+        osc.frequency.value = ROOT * snap(ratio, CHORDS[chord].tones, false) * k; osc.detune.value = cents;
         // Drift, not vibrato: two slow, uneven wanders of a few cents per singer.
         for (const [hz, depth] of [[0.07 + Math.random() * 0.08, 3], [0.17 + Math.random() * 0.1, 2]]) {
           const w = ac.createOscillator(); w.frequency.value = hz;
@@ -672,7 +673,7 @@
       const air = ac.createBufferSource(); air.buffer = nzb; air.loop = true;
       const ahp = ac.createBiquadFilter(); ahp.type = 'highpass'; ahp.frequency.value = 700;
       const am = ac.createGain(); am.gain.value = 0;
-      const pulse = ac.createOscillator(); pulse.frequency.value = ROOT * snap(ratio, CHORDS[chord].tones, false);
+      const pulse = ac.createOscillator(); pulse.frequency.value = ROOT * snap(ratio, CHORDS[chord].tones, false) * k;
       const pd = ac.createGain(); pd.gain.value = 0.5;
       const off = ac.createConstantSource(); off.offset.value = 0.5;
       pulse.connect(pd); pd.connect(am.gain); off.connect(am.gain);
@@ -745,7 +746,7 @@
   function scheduleDetune() {
     later(() => {
       if (!graph) return;
-      if (!detuning) {
+      if (!detuning && actx.currentTime >= settled) {
         detuning = true;
         const v = graph.voices[1 + Math.floor(Math.random() * 4)];
         const cents = (3 + Math.random() * 6) * (Math.random() < 0.5 ? -1 : 1), stay = 6 + Math.random() * 6;
@@ -788,33 +789,51 @@
     if (x > 0.88) return hi * (1.2 + Math.random() * 0.6);           // a long settle
     return lo + (hi - lo) * (Math.random() + Math.random()) / 2;     // mostly the middle
   }
-  function scheduleGlide() {
+  // One glide for the walk and the opening: each tone sets off within `spread` and takes dur × (1 ± width),
+  // an exponential ramp from wherever it is. Returns when the last one lands.
+  function slide(tones, dur, spread, width, strings) {
+    const t = actx.currentTime;
+    let landed = t;
+    const glide = (p, hz, off, d) => {
+      freeze(p, t); p.setValueAtTime(p.value, t + off); p.exponentialRampToValueAtTime(hz, t + off + d);
+    };
+    const own = () => {
+      const o = Math.random() * spread, d = dur * (1 - width + Math.random() * 2 * width);
+      landed = Math.max(landed, t + o + d);
+      return [o, d];
+    };
+    graph.voices.forEach((v, i) => { const [o, d] = own(); glide(v.osc.frequency, ROOT * snap(MAIN_R0[i], tones, i === 0), o, d); });
+    graph.upper.forEach((u) => { const [o, d] = own(); u.f = ROOT * snap(u.r0, tones, false); glide(u.osc.frequency, u.f, o, d); });
+    graph.choir.forEach((c) => {
+      const [o, d] = own();                                              // one person: their singers move together
+      c.f = ROOT * snap(c.r0, tones, false); c.until = t + o + d + 0.3; landed = Math.max(landed, c.until);
+      for (const os of c.oscs) glide(os.frequency, c.f, o + Math.random() * 0.3, d);
+      glide(c.pulse.frequency, c.f, o, d);
+    });
+    if (strings) graph.strings.forEach((sg) => {
+      const [o, d] = own(), f = ROOT * snap(sg.r0, tones, false); sg.f = f;
+      for (const os of sg.oscs) glide(os.frequency, f, o, d);
+    });
+    return landed;
+  }
+  function scheduleGlide(wait = 0) {
     const [lo, hi] = CHORDS[chord].hold;
     later(() => {
       if (!graph) return;
       chord = pickNext(chord);
-      const tones = CHORDS[chord].tones, t = actx.currentTime;
       const dur = 3 + 17 * Math.pow(Math.random(), 0.75);               // 3–20 s, leaning slow
-      const spread = Math.min(4, dur * 0.35);
-      const glide = (p, hz, off, d) => {
-        freeze(p, t); p.setValueAtTime(p.value, t + off); p.exponentialRampToValueAtTime(hz, t + off + d);
-      };
-      const own = () => [Math.random() * spread, dur * (0.7 + Math.random() * 0.6)];
-      graph.voices.forEach((v, i) => { const [o, d] = own(); glide(v.osc.frequency, ROOT * snap(MAIN_R0[i], tones, i === 0), o, d); });
-      graph.upper.forEach((u) => { const [o, d] = own(); u.f = ROOT * snap(u.r0, tones, false); glide(u.osc.frequency, u.f, o, d); });
-      graph.choir.forEach((c) => {
-        const [o, d] = own();                                            // one person: their singers move together
-        c.f = ROOT * snap(c.r0, tones, false); c.until = t + o + d + 0.3;
-        for (const os of c.oscs) glide(os.frequency, c.f, o + Math.random() * 0.3, d);
-        glide(c.pulse.frequency, c.f, o, d);
-      });
-      graph.strings.forEach((sg) => {
-        const [o, d] = own(), f = ROOT * snap(sg.r0, tones, false); sg.f = f;
-        for (const os of sg.oscs) glide(os.frequency, f, o, d);
-      });
+      slide(CHORDS[chord].tones, dur, Math.min(4, dur * 0.35), 0.3, true);
       if (debug) console.log('[hum] chord →', chord, 'glide', dur.toFixed(1) + 's');
       scheduleGlide();
-    }, holdFor(lo, hi) * 1000);
+    }, (wait + holdFor(lo, hi)) * 1000);
+  }
+  // Tuning in: on a fresh build every tone starts off pitch and slides into the chord, slower and
+  // steadier than the walk (16–20 s, tighter spread). The walk, detunes and blooms wait for it to land.
+  let settled = 0;
+  function tuneIn() {
+    const dur = 16 + Math.random() * 4;
+    settled = slide(CHORDS[chord].tones, dur, 3, 0.15, false);
+    if (debug) console.log('[hum] opening glide', dur.toFixed(1) + 's');
   }
   // Blooms: now and then one tone leans in — vibrato swells up, holds, and lets go. Mostly the
   // humming voices, wider and quicker; sometimes a synth voice, slower and narrower. At most two at once.
@@ -822,7 +841,7 @@
   function scheduleVibrato() {
     later(() => {
       if (!graph) return;
-      if (blooming < 2) {
+      if (blooming < 2 && actx.currentTime >= settled) {
         const pool = [...graph.choir, ...graph.choir, ...graph.voices.slice(1), ...graph.upper].filter((v) => !v.blooming);
         const v = pool[Math.floor(Math.random() * pool.length)];
         if (v) {
@@ -973,7 +992,7 @@
     unmute();
     actx.resume().catch(() => {});
     clearTimeout(tearDown);
-    if (!graph) { build(); scheduleDetune(); scheduleGlide(); scheduleColour(); scheduleBreath(); scheduleVibrato(); scheduleStrings(); scheduleTremolo(); scheduleKey(true); }
+    if (!graph) { build(); tuneIn(); scheduleDetune(); scheduleGlide(settled - actx.currentTime); scheduleColour(); scheduleBreath(); scheduleVibrato(); scheduleStrings(); scheduleTremolo(); scheduleKey(true); }
     fadeIn(LEVEL, 10);
     if (debug) window.__hum = { ctx: actx, master: graph.master, graph };
   }
