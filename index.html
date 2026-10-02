@@ -10,6 +10,7 @@
 <meta property="og:description" content="It beats. Faster, it sings. Faster, it shines. Into form. This is the hum.">
 <meta property="og:url" content="https://thehum.is/">
 <title>The Hum</title>
+<script>try { if (!localStorage.getItem('hum.entered') && !localStorage.getItem('hum.heard')) document.documentElement.classList.add('entering'); } catch (e) {}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;1,6..72,300&display=swap" rel="stylesheet">
@@ -136,6 +137,84 @@
   }
   .hum-hint.fade { opacity: 0; }
 
+  /* First visit: the void starts closed, a third of its size, with the name in it.
+     Tapping it is the way in. Without JS, or once entered, none of this shows.
+     The reset under the links plays it backwards, back to this door. */
+  .door { display: none; }
+  .entering .door, .opening .door { display: block; position: fixed; inset: 0; z-index: 3; pointer-events: none; }
+  .entering .void { transform: translate(-50%, -50%) scale(0.3333); }
+  .entering .head { opacity: 0; visibility: hidden; }
+  .entering .verse span { opacity: 0; }   /* hidden to the eye only; still read */
+  .door-in {
+    appearance: none; -webkit-appearance: none;
+    background: none; border: 0; margin: 0; padding: 0;
+    position: absolute; left: 50%; top: 50%;
+    width: calc(var(--d) / 3); height: calc(var(--d) / 3);
+    transform: translate(-50%, -50%); border-radius: 50%;
+    display: grid; place-items: center;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-weight: 500; font-size: var(--inscription-size);
+    letter-spacing: 0.38em; text-transform: uppercase;
+    color: var(--ink-dim);
+    cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  }
+  .door-name { display: flex; flex-direction: column; align-items: center; opacity: 0.75; transition: opacity 300ms ease; }
+  .door-word { padding-left: 0.38em; }   /* balances the trailing tracking, as in the header */
+  .door-hint {
+    margin-top: 9px;
+    font-family: "Newsreader", Georgia, serif; font-style: italic; font-weight: 300;
+    font-size: 11px; letter-spacing: 0.02em; text-transform: none;
+    opacity: 0.6;   /* inside the name's 0.75: the header hint's 0.45 */
+  }
+  .door-in:hover .door-name { opacity: 0.95; }
+  .door-in:focus, .door-quiet:focus { outline: none; }
+  .door-in:focus-visible .door-name, .door-quiet:focus-visible {
+    outline: 1px solid rgba(180,140,255,0.6); outline-offset: 5px; border-radius: 2px;
+  }
+  .door-ways {
+    position: absolute; left: 0; right: 0; top: calc(50% + var(--d) / 6 + 14px);
+    display: flex; flex-direction: column; align-items: center;
+    font-family: "Newsreader", Georgia, serif; font-style: italic; font-weight: 300;
+    letter-spacing: 0.02em; color: var(--ink-dim);
+  }
+  .door-quiet {
+    appearance: none; -webkit-appearance: none; background: none; border: 0; margin: 0; padding: 0 14px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font: inherit; font-size: 10px; letter-spacing: inherit; color: inherit;
+    min-height: 44px; opacity: 0.28; transition: opacity 300ms ease;
+    cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  }
+  .door-quiet:hover { opacity: 0.5; }
+  .arriving .door-in, .arriving .door-ways { animation: appear 1.2s ease both; }
+  @keyframes appear { from { opacity: 0; } }
+  /* The tap: the void opens (drawn by the canvas, 2.4 s) and the name is pulled in as it goes,
+     gone by the middle; the name lands at the top as the void settles, then the verse a line at a time. */
+  @media (prefers-reduced-motion: no-preference) {
+    .opening .door-in .door-name {   /* outranks :hover, which the tapping pointer is still on */
+      opacity: 0; transform: scale(0.2);
+      transition: all 1.2s cubic-bezier(0.55, 0, 1, 0.45);   /* falling: slow, then all at once */
+    }
+    .opening .door-word { letter-spacing: 0; padding-left: 0; transition: all 1.2s cubic-bezier(0.55, 0, 1, 0.45); }
+    .opening .door-ways { opacity: 0; transition: opacity 0.6s ease; }
+    .opening .head { transition: opacity 0.9s ease 1.9s, visibility 0s linear 1.9s; }
+    .opening .verse span { transition: opacity 0.9s ease calc(2.2s + var(--i, 0) * 70ms); }
+    /* Backwards: the verse goes last line first, then the name, then the void closes (2.4 s from 0.4 s). */
+    .leaving .verse span { opacity: 0; transition: opacity 0.5s ease calc(var(--i, 0) * 40ms); }
+    .leaving .head { opacity: 0; visibility: hidden; transition: opacity 0.6s ease 0.2s, visibility 0s linear 0.8s; }
+  }
+  /* Reduced motion: no pull, no opening. The door fades out, the page fades in. */
+  @media (prefers-reduced-motion: reduce) {
+    .opening .door { opacity: 0; transition: opacity 0.6s ease; }
+    .opening .stage { transition: opacity 0.6s ease; }
+    .opening.dark .stage { opacity: 0; }
+    .opening .head { transition: opacity 0.8s ease 0.3s, visibility 0s linear 0.3s; }
+    .opening .verse span { transition: opacity 0.8s ease 0.3s; }
+    .leaving .head { opacity: 0; visibility: hidden; transition: opacity 0.6s ease, visibility 0s linear 0.6s; }
+    .leaving .verse span { opacity: 0; transition: opacity 0.6s ease; }
+    .leaving .stage, .arriving .stage { transition: opacity 0.6s ease; }
+    .leaving.dark .stage { opacity: 0; }
+  }
+
   /* Verse sits in flow so a short viewport scrolls instead of clipping.
      Symmetric padding keeps it on the viewport center when it fits; the
      bottom pad also reserves the footer's room. */
@@ -198,6 +277,19 @@
     opacity: 1;
     outline: none;
   }
+  .foot a { position: relative; z-index: 1; }   /* the links keep their whole target where the reset's reaches up under them */
+  /* Reset: a small turning arrow in the gap under the links, easy to miss. Brings the entrance back. */
+  .foot-reset {
+    appearance: none; -webkit-appearance: none; background: none; border: 0; margin: 0; padding: 0 0 18px;
+    position: absolute; left: 50%; bottom: env(safe-area-inset-bottom, 0px); transform: translateX(-50%);
+    width: 44px; height: 44px; display: flex; align-items: flex-end; justify-content: center;
+    color: var(--ink-dim); opacity: 0.38; cursor: pointer;   /* half the links' */
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    transition: color 300ms ease, opacity 300ms ease;
+  }
+  .foot-reset:hover, .foot-reset:focus-visible { opacity: 0.75; outline: none; }   /* up to the links' rest, no further */
+  .foot-reset svg { display: block; width: 10px; height: 10px; }
+  .entering .foot-reset, .opening .foot-reset, .leaving .foot-reset { visibility: hidden; opacity: 0; }
 </style>
 </head>
 <body>
@@ -207,9 +299,16 @@
   <div class="void"></div>
 </div>
 
+<div class="door">
+  <button type="button" class="door-in" aria-label="The Hum. Tap to hear"><span class="door-name"><span class="door-word">The Hum</span><span class="door-hint">tap to hear</span></span></button>
+  <div class="door-ways">
+    <button type="button" class="door-quiet" aria-label="Enter silently">silently</button>
+  </div>
+</div>
+
 <h1 class="head">
   <button type="button" class="hum-toggle" id="hum" aria-pressed="false" aria-label="Turn the hum on"><span class="hum-text">The Hum</span></button>
-  <span class="hum-hint" id="hum-hint" aria-hidden="true" hidden>tap to listen</span>
+  <span class="hum-hint" id="hum-hint" aria-hidden="true" hidden>tap to hear</span>
 </h1>
 
 <main class="verse-wrap">
@@ -238,6 +337,7 @@
 <footer class="foot">
   <a href="https://thehum.studio" aria-label="thehum.studio">studio</a>
   <a href="https://thehum.works" aria-label="thehum.works">works</a>
+  <button type="button" class="foot-reset" aria-label="See the entrance again"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9"/><path d="M12.2 1.6v2.8H9.4"/></svg></button>
 </footer>
 
 <script>
@@ -254,6 +354,10 @@
   let glow = null;      // cached outer glow, drawn once per resize
   let ringGrad = null;  // cached conic tint
   let points = [];
+  // The aperture: how open the void is, 1/3 at the door, 1 once entered. swing() eases it between.
+  const SHUT = 1 / 3, SWING_MS = 2400;
+  let aperture = document.documentElement.classList.contains('entering') ? SHUT : 1, apFrom = aperture, apTo = aperture, apAt = 0;
+  const swing = (to, at) => { apFrom = aperture; apTo = to; apAt = at; };
 
   const mix = (a, b, t) => {
     const pa = [1, 3, 5].map(i => parseInt(a.slice(i, i + 2), 16));
@@ -273,15 +377,16 @@
     canvas.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     cx = W / 2; cy = H / 2;
-    r = r0 = voidEl.offsetWidth / 2;   // layout size, unaffected by the pulse's scale
+    r0 = voidEl.offsetWidth / 2;   // layout size, unaffected by the pulse's scale or the aperture
+    r = r0 * aperture;
     maxR = Math.hypot(W, H) / 2;
 
     // Glow: outside the ring only, so the interior stays flat.
-    const gs = Math.ceil((r + 24) * 2), g = document.createElement('canvas');
+    const gs = Math.ceil((r0 + 24) * 2), g = document.createElement('canvas');
     g.width = g.height = Math.round(gs * dpr);
     const gc = g.getContext('2d'); gc.scale(dpr, dpr);
-    const grad = gc.createRadialGradient(gs / 2, gs / 2, 0, gs / 2, gs / 2, r + 18);
-    const e = r / (r + 18);
+    const grad = gc.createRadialGradient(gs / 2, gs / 2, 0, gs / 2, gs / 2, r0 + 18);
+    const e = r0 / (r0 + 18);
     grad.addColorStop(0, 'rgba(180,140,255,0)');
     grad.addColorStop(e, 'rgba(180,140,255,0)');
     grad.addColorStop(e + 0.0001, 'rgba(180,140,255,0.22)');
@@ -453,9 +558,15 @@
     const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
     ctx.clearRect(0, 0, W, H);
     // The void breathes with the hum: up to 4.5% wider on each swell, back on the ebb.
-    const sc = 1 + 0.045 * (vis.pulse ? vis.pulse() : 0);
-    r = r0 * sc;
-    if (Math.abs(sc - lastScale) > 0.0002) { voidEl.style.transform = `translate(-50%, -50%) scale(${sc.toFixed(4)})`; lastScale = sc; }
+    // Opening or closing: a long, held start, a rush, a long settle (quintic in-out).
+    if (apAt && now >= apAt) {
+      const p = Math.min(1, (now - apAt) / SWING_MS);
+      aperture = apFrom + (apTo - apFrom) * (p < 0.5 ? 16 * p ** 5 : 1 - (2 - 2 * p) ** 5 / 2);
+      if (p === 1) { apAt = 0; lastScale = -1; }   // land exactly
+    }
+    const sc = 1 + 0.045 * (vis.pulse ? vis.pulse() : 0), s = aperture * sc;
+    r = r0 * s;
+    if (Math.abs(s - lastScale) > 0.0002) { voidEl.style.transform = `translate(-50%, -50%) scale(${s.toFixed(4)})`; lastScale = s; }
     step(dt);
     drawPoints();
     drawRing(1, now - t0);
@@ -467,6 +578,7 @@
 
   function drawStatic() { ctx.clearRect(0, 0, W, H); drawRing(0.9, BEAM_PERIOD * 0.15); }
 
+  if (aperture < 1) { voidEl.style.transform = `translate(-50%, -50%) scale(${SHUT.toFixed(4)})`; lastScale = SHUT; }
   layout();
   if (reduced) {
     drawStatic();
@@ -543,9 +655,10 @@
   let actx = null, graph = null, on = false, timers = [], tearDown = 0, hideTimer = 0, silent = null;
   let lastTick = 0, chord = 'major', detuning = false;
 
-  const heard = () => { try { return !!localStorage.getItem('hum.heard'); } catch (e) { return false; } };
   const remember = () => { try { localStorage.setItem('hum.heard', '1'); } catch (e) {} };
-  if (!heard()) hint.hidden = false;
+  // The hint shows whenever the hum is off, which is how every visit starts. hum.heard only skips the entrance.
+  let hintTimer = 0;
+  hint.hidden = false;
 
   function impulse(ac, secs) {   // a room, synthesized: decaying noise, ~5 s
     const n = Math.round(ac.sampleRate * secs), buf = ac.createBuffer(2, n, ac.sampleRate);
@@ -1006,11 +1119,61 @@
     on = !on;
     btn.setAttribute('aria-pressed', String(on));
     btn.setAttribute('aria-label', on ? 'Turn the hum off' : 'Turn the hum on');
+    clearTimeout(hintTimer);
     if (on) {
-      enable();
-      if (!hint.hidden) { remember(); hint.classList.add('fade'); setTimeout(() => { hint.hidden = true; }, 1700); }
-    } else disable();
+      enable(); remember();
+      hint.classList.add('fade'); hintTimer = setTimeout(() => { hint.hidden = true; }, 1700);
+    } else {
+      disable();
+      hint.hidden = false; void hint.offsetWidth; hint.classList.remove('fade');   // unhide, then fade back in
+    }
   });
+  // ---- The way in ------------------------------------------------------------
+  // The circle enters with the hum on, through the header's own switch; "silently" enters with
+  // it off. Either way the entrance is remembered. The reset under the links runs it backwards.
+  const root = document.documentElement, door = document.querySelector('.door'), reset = document.querySelector('.foot-reset');
+  const lines = document.querySelectorAll('.verse span');
+  const order = (back) => lines.forEach((l, i) => l.style.setProperty('--i', back ? lines.length - 1 - i : i));
+  const unorder = () => lines.forEach((l) => l.style.removeProperty('--i'));
+  const snapTo = (a) => { aperture = a; voidEl.style.transform = a < 1 ? `translate(-50%, -50%) scale(${a.toFixed(4)})` : ''; layout(); drawStatic(); };
+  function enter(listen) {
+    if (!root.classList.contains('entering')) return;
+    try { localStorage.setItem('hum.entered', '1'); } catch (e) {}
+    const focused = door.contains(document.activeElement);
+    if (graph && !on) { clearTimeout(tearDown); destroy(); }   // a reset's fade still running: listen builds fresh and tunes in
+    if (listen) btn.click();
+    order(false);
+    root.classList.add('opening'); root.classList.remove('entering', 'arriving');
+    if (reduced) {
+      root.classList.add('dark');
+      setTimeout(() => { snapTo(1); root.classList.remove('dark'); }, 600);
+    } else swing(1, performance.now());
+    setTimeout(() => {
+      root.classList.remove('opening'); unorder();
+      if (focused) btn.focus({ preventScroll: true });
+    }, reduced ? 1500 : 4000);
+  }
+  function leave() {
+    if (root.matches('.entering, .opening, .leaving')) return;
+    try { localStorage.removeItem('hum.entered'); localStorage.removeItem('hum.heard'); } catch (e) {}
+    const focused = document.activeElement === reset;
+    if (on) btn.click();   // the header's own switch: the hum fades over 2 s
+    order(true);
+    root.classList.add('leaving');
+    if (reduced) root.classList.add('dark');
+    else swing(SHUT, performance.now() + 400);
+    setTimeout(() => {
+      if (reduced) { snapTo(SHUT); root.classList.remove('dark'); }   // the hum's 2 s fade may outlast this; enter() clears it
+      unorder();
+      root.classList.add('entering', 'arriving'); root.classList.remove('leaving');
+      if (focused) door.querySelector('.door-in').focus({ preventScroll: true });
+      setTimeout(() => root.classList.remove('arriving'), 1200);
+    }, reduced ? 600 : 2800);
+  }
+  door.querySelector('.door-in').addEventListener('click', () => enter(true));
+  door.querySelector('.door-quiet').addEventListener('click', () => enter(false));
+  reset.addEventListener('click', leave);
+
   document.addEventListener('visibilitychange', () => {
     if (!graph || !on) return;
     clearTimeout(hideTimer);
