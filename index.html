@@ -1449,6 +1449,19 @@
       actx.resume().then(() => { if (graph && on) ramp(LEVEL, 1.5); }).catch(() => {});
     }
   });
+
+  // Leaving through the footer: let the hum fall away before the next page. New-tab clicks go straight through.
+  const LEAVE_FADE = 0.6;
+  document.querySelectorAll('.foot a').forEach((a) => a.addEventListener('click', (e) => {
+    if (!graph || !on || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    ramp(0, LEAVE_FADE);
+    setTimeout(() => { location.href = a.href; }, LEAVE_FADE * 1000 + 50);
+  }));
+  // Back from a link: the page can return from the back-forward cache with the hum faded out.
+  addEventListener('pageshow', (e) => {
+    if (e.persisted && graph && on) actx.resume().then(() => { if (graph && on) ramp(LEVEL, 1.5); }).catch(() => {});
+  });
 })();
 </script>
 </body>
