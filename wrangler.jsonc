@@ -1,0 +1,19 @@
+{
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  "name": "thehum-is",
+  // The Hum Works account. Pinned so a deploy can never land in a client's account.
+  "account_id": "45d776b5135f0d543d0eea9c7f085c80",
+  "compatibility_date": "2026-10-02",
+  // Static site only: no Worker script, just what's in public/.
+  "assets": {
+    "directory": "./public"
+  },
+  // Serve the apex and www directly; Cloudflare creates the DNS records.
+  "routes": [
+    { "pattern": "thehum.is", "custom_domain": true },
+    { "pattern": "www.thehum.is", "custom_domain": true }
+  ],
+  "workers_dev": true,
+  // Required by `wrangler preview`, which Workers Builds runs for branches.
+  "previews": {}
+}
