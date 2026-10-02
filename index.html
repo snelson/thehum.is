@@ -482,6 +482,18 @@
     return p;
   }
 
+  // A tap in the field: a new point where it landed, a little brighter, that gathers speed over TAP_EASE s
+  // into a quicker infall (TAP_FALL px/s on top of the pull), so it crosses in a few seconds; its
+  // brightness settles over TAP_GLOW s.
+  const TAP_FALL = 80, TAP_EASE = 1.2, TAP_GLOW = 1.5, TAP_SIZE = 2.2;
+  function addTap(x, y, voice) {
+    const dx = x - cx, dy = y - cy, rad = Math.hypot(dx, dy);
+    if (reduced || rad <= r + 12) return null;
+    const p = { a: Math.atan2(dy, dx), rad, born: rad + 1, w: spin * 2 * Math.PI / 180, size: TAP_SIZE,
+                tap: { glow: 1, age: 0, voice, d0: Math.max(1, rad - r - 6) } };
+    points.push(p);
+    return p;
+  }
   function step(dt) {
     for (let i = 0; i < points.length; i++) {
       const p = points[i];
@@ -490,8 +502,14 @@
       // over the last ~100 px (≈7 px/s far, ≈50 at 60 px, ≈170 at the edge), and the swirl
       // tightens with it, so each point spirals and is swallowed.
       const pull = Math.exp(-d / 38);
-      p.rad -= (7 + 175 * pull) * dt;
+      p.rad -= (p.tap ? (TAP_FALL + 175 * pull) * Math.min(1, (p.tap.age += dt) / TAP_EASE) : 7 + 175 * pull) * dt;
       p.a += (p.w * 120 / Math.max(p.rad, 1)) * (1 + 3 * pull) * dt;
+      if (p.tap) {   // a tapped point: its tone sinks as it falls, and goes as it crosses
+        p.tap.glow = Math.max(0, p.tap.glow - dt / TAP_GLOW);
+        if (p.tap.voice) tapRedshift(p.tap.voice, 1 - Math.max(0, d - 6) / p.tap.d0);
+        if (p.rad <= r + 6) { if (p.tap.voice) tapRelease(p.tap.voice, TAP_CROSS); points.splice(i--, 1); }
+        continue;
+      }
       if (p.rad <= r + 6) points[i] = spawn(false);   // nothing enters the ring
     }
   }
@@ -615,7 +633,8 @@
       let t = Math.min(1, Math.max(0, 1 - (p.rad - r) / (p.born - r)));
       t = t * t;              // most of the warming happens near the ring
       const edge = Math.min(1, Math.max(0, (p.rad - r - 6) / 10));   // the last few px: gone into the glow
-      const alpha = (0.2 + 0.55 * t) * edge, size = p.size * (0.6 + 0.4 * edge);
+      const lit = p.tap ? p.tap.glow : 0;   // a tapped point starts brighter and settles to the field's own
+      const alpha = Math.min(1, (0.2 + 0.55 * t) * edge + 0.6 * lit), size = p.size * (0.6 + 0.4 * edge) * (1 + 0.6 * lit);
       ctx.fillStyle = rgba(mix(rgba0(FAR), rgba0(NEAR), t), alpha);
       ctx.fillRect(x - size / 2, y - size / 2, size, size);
     }
@@ -738,6 +757,8 @@
   const debug = location.hash === '#humdebug';
   if (debug) window.__field = {   // for checks: the dent, and the mean drawn shift of the particles within DENT_RADIUS of it
     dent, constants: { DENT_STRENGTH, DENT_RADIUS, DENT_RISE, DENT_FOLLOW, DENT_LEAVE },
+    taps() { return points.filter((p) => p.tap).map((p) => +(p.rad - r).toFixed(1)); },
+    voices() { return tapVoices.length; },
     sample() { let n = 0, sum = 0, max = 0; for (const p of points) { const x = cx + Math.cos(p.a) * p.rad, y = cy + Math.sin(p.a) * p.rad; if (Math.hypot(x - dent.x, y - dent.y) < DENT_RADIUS) { const v = Math.hypot(...lens(x, y)); n++; sum += v; max = Math.max(max, v); } } return { n, mean: n ? sum / n : 0, max, m: dent.m }; },
   };
   const PULSE_HZ = (ROOT * 2) / 1024;
@@ -790,6 +811,8 @@
     const shelf = ac.createBiquadFilter(); shelf.type = 'lowshelf'; shelf.frequency.value = 150; shelf.gain.value = -6;
     filter.connect(pulse); pulse.connect(shelf); shelf.connect(pan); pan.connect(dry); pan.connect(conv); conv.connect(wet);
     dry.connect(master); wet.connect(master); master.connect(ac.destination);
+    // Taps come in after the hum's own filter and lean, each panned by itself, into the same room.
+    const taps = ac.createGain(); taps.gain.value = 1; taps.connect(dry); taps.connect(conv);
     // Air: the lowpass wanders 1700–3100 Hz over ~40 s, open enough for the upper voices.
     const fl = ac.createOscillator(); fl.frequency.value = 1 / 40;
     const flg = ac.createGain(); flg.gain.value = 700;
@@ -929,9 +952,11 @@
     const key = ac.createConstantSource(); key.offset.value = 0; key.start(now); sources.push(key);
     for (const o of [...voices.map((v) => v.osc), ...upper.map((u) => u.osc), ...choir.flatMap((c) => [...c.oscs, c.pulse]), ...strings.flatMap((sg) => sg.oscs), col])
       key.connect(o.detune);
-    graph = { master, filter, pan, swell, voices, upper, colour, sources, choir, inhale, strings, key };
+    graph = { master, filter, pan, swell, voices, upper, colour, sources, choir, inhale, strings, key, taps };
   }
   function destroy() {
+    for (const v of tapVoices) for (const o of v.oscs) { try { o.stop(); } catch (e) {} }
+    tapVoices = [];
     for (const id of timers) clearTimeout(id);
     timers = []; detuning = false; blooming = 0; away = false;
     for (const s of graph.sources) { try { s.stop(); } catch (e) {} }
@@ -947,6 +972,77 @@
     else { const v = p.value; p.cancelScheduledValues(t); p.setValueAtTime(v, t); }
   };
   const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+  if (debug) setTimeout(() => { window.__tapTone = tapTone; });
+  // ---- A tap's tone ----------------------------------------------------------
+  // A soft bell on one of the chord's tones (with the key's lean), its octave by how far from the void the
+  // tap is: near the ring low and dark, far out high and clear, climbing the chord's tones through
+  // TAP_OCTAVES. Panned by x. It sinks up to TAP_REDSHIFT cents as its point falls and goes as it crosses.
+  // At most TAP_VOICES at once; a new one takes the oldest's place.
+  const TAP_OCTAVES = [2, 5], TAP_GAIN = 0.05, TAP_DECAY = 4, TAP_REDSHIFT = 40,
+        TAP_CROSS = 0.3, TAP_VOICES = 4, TAP_PAN = 0.8;
+  // Softer as it rises: the attack lengthens from TAP_ATTACK[0] at the bottom rung to TAP_ATTACK[1] at the
+  // top; the level falls TAP_TAPER_DB across the range; the upper partials fade above TAP_SOFT_HZ; and a
+  // gentle lowpass follows the note at TAP_LP_MULT × its pitch, never above TAP_LP_MAX Hz.
+  const TAP_ATTACK = [0.015, 0.07], TAP_TAPER_DB = 5, TAP_SOFT_HZ = 900, TAP_LP_MULT = 3.5, TAP_LP_MAX = 4500;
+  const TAP_PARTIALS = [[1, 1, 1], [2.76, 0.22, 0.45], [5.4, 0.07, 0.25]];   // [ratio, gain, decay share]: a soft glass bell
+  let tapVoices = [];
+  // Distance sets the register, but the note is drawn from the TAP_SPREAD rungs nearest it, the closest most
+  // likely; the note just played keeps only TAP_REPEAT of its weight, so repeats happen but rarely.
+  const TAP_SPREAD = 3, TAP_REPEAT = 0.2;
+  let tapLast = 0;
+  function tapPitch(u) {   // u: 0 at the ring … 1 far out → a chord tone (Hz, before the key's lean)
+    const tones = CHORDS[chord].tones, ladder = [];
+    for (let k = TAP_OCTAVES[0]; k < TAP_OCTAVES[1]; k++) for (const t of tones) ladder.push(t * 2 ** k);
+    ladder.push(2 ** TAP_OCTAVES[1]);
+    ladder.sort((a, b) => a - b);
+    const pos = Math.min(1, Math.max(0, u)) * (ladder.length - 1);
+    const near = ladder.map((ratio, i) => ({ ratio, d: Math.abs(i - pos) })).sort((a, b) => a.d - b.d).slice(0, TAP_SPREAD);
+    for (const c of near) c.w = (1 / (0.5 + c.d)) * (Math.abs(c.ratio - tapLast) < 1e-9 ? TAP_REPEAT : 1);
+    let x = Math.random() * near.reduce((a, c) => a + c.w, 0), ratio = near[0].ratio;
+    for (const c of near) { x -= c.w; if (x <= 0) { ratio = c.ratio; break; } }
+    tapLast = ratio;
+    return { hz: ROOT * ratio, ratio };
+  }
+  function tapRelease(v, secs) {
+    if (v.gone) return; v.gone = true;
+    const t = actx.currentTime;
+    freeze(v.env.gain, t); v.env.gain.setTargetAtTime(0, t, secs / 3);
+    for (const o of v.oscs) { try { o.stop(t + secs + 0.2); } catch (e) {} }
+    tapVoices = tapVoices.filter((x) => x !== v);
+  }
+  function tapRedshift(v, f) {   // f: 0 where it was tapped … 1 at the ring
+    if (v.gone || !graph) return;
+    v.shift.offset.setTargetAtTime(-TAP_REDSHIFT * Math.min(1, Math.max(0, f)) ** 1.5, actx.currentTime, 0.1);
+  }
+  function tapTone(x, u) {
+    if (!graph || !on) return null;
+    while (tapVoices.length >= TAP_VOICES) tapRelease(tapVoices[0], 0.08);   // steal the oldest
+    const ac = actx, t = ac.currentTime, { hz, ratio } = tapPitch(u);
+    const up = Math.min(1, Math.max(0, (Math.log2(ratio) - TAP_OCTAVES[0]) / (TAP_OCTAVES[1] - TAP_OCTAVES[0])));   // 0 bottom … 1 top
+    const attack = TAP_ATTACK[0] + (TAP_ATTACK[1] - TAP_ATTACK[0]) * up;
+    const env = ac.createGain(); env.gain.value = 0;
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.5; lp.frequency.value = Math.min(TAP_LP_MAX, hz * TAP_LP_MULT);
+    const sp = ac.createStereoPanner(); sp.pan.value = Math.max(-1, Math.min(1, ((x / W) * 2 - 1) * TAP_PAN));
+    env.connect(lp); lp.connect(sp); sp.connect(graph.taps);
+    const shift = ac.createConstantSource(); shift.offset.value = 0; shift.start(t);
+    const oscs = [shift];
+    for (const [k, g, share] of TAP_PARTIALS) {
+      const o = ac.createOscillator(); o.frequency.value = hz * k;
+      graph.key.connect(o.detune); shift.connect(o.detune);
+      const soft = k > 1 ? 1 / (1 + (hz / TAP_SOFT_HZ) ** 2) : 1;
+      const pg = ac.createGain(); pg.gain.value = 0;
+      pg.gain.setValueAtTime(0, t); pg.gain.linearRampToValueAtTime(g * soft, t + attack);
+      pg.gain.setTargetAtTime(0, t + attack, (TAP_DECAY * share) / 4);
+      o.connect(pg); pg.connect(env); o.start(t); o.stop(t + TAP_DECAY + 1); oscs.push(o);
+    }
+    env.gain.setValueAtTime(TAP_GAIN * 10 ** (-TAP_TAPER_DB * up / 20), t);
+    const v = { env, out: lp, oscs, shift, gone: false };
+    if (debug) window.__lastTap = v;
+    tapVoices.push(v);
+    later(() => { tapVoices = tapVoices.filter((x) => x !== v); }, (TAP_DECAY + 1) * 1000);
+    if (debug) console.log('[hum] tap', hz.toFixed(2) + 'Hz', 'ratio ' + ratio.toFixed(4), 'octave ' + Math.floor(Math.log2(ratio)), 'chord ' + chord, 'u ' + u.toFixed(2));
+    return v;
+  }
   const hold = (p, from, to, up, stay, down, t) => {   // ramp up, hold, ramp back
     p.cancelScheduledValues(t); p.setValueAtTime(from, t);
     p.linearRampToValueAtTime(to, t + up); p.setValueAtTime(to, t + up + stay); p.linearRampToValueAtTime(from, t + up + stay + down);
@@ -1411,6 +1507,17 @@
   }, true);
   addEventListener('wheel', skip, { passive: true });
   addEventListener('scroll', skip, { passive: true });
+  // A tap in the field, once entered (during the entrance a tap skips; at the door nothing new): a point
+  // where it landed, and, with the hum on, its tone. Taps on the name, links, the end mark or any button
+  // behave as before. Outside the ring only.
+  addEventListener('pointerdown', (e) => {
+    if (root.matches('.entering, .opening, .pacing, .leaving')) return;
+    if (e.target.closest && e.target.closest('button, a, .head, .door, .foot')) return;
+    const d = Math.hypot(e.clientX - cx, e.clientY - cy) - r;
+    if (d <= 12) return;
+    const u = d / Math.max(1, maxR - r);
+    addTap(e.clientX, e.clientY, tapTone(e.clientX, u));
+  }, { passive: true });
   const snapTo = (a) => { aperture = a; voidEl.style.transform = a < 1 ? `translate(-50%, -50%) scale(${a.toFixed(4)})` : ''; layout(); drawStatic(); };
   // The pointer goes quiet after the tap that enters (not on touch: there's nothing to hide), and comes
   // back on its first real move, or if the page loses focus or is hidden. Only listened for while hidden.
