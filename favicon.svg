@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="void">
+      <stop offset="0" stop-color="#040309"/>
+      <stop offset=".45" stop-color="#06050d"/>
+      <stop offset=".82" stop-color="#0a0915"/>
+      <stop offset="1" stop-color="#0d0b18"/>
+    </radialGradient>
+    <radialGradient id="glow">
+      <stop offset=".62" stop-color="#b48cff" stop-opacity="0"/>
+      <stop offset=".7" stop-color="#b48cff" stop-opacity=".3"/>
+      <stop offset="1" stop-color="#b48cff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#b48cff"/>
+      <stop offset=".25" stop-color="#ca7eea"/>
+      <stop offset=".5" stop-color="#b48cff"/>
+      <stop offset=".8" stop-color="#96a2ef"/>
+      <stop offset="1" stop-color="#b48cff"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="12" fill="#0b0a14"/>
+  <circle cx="32" cy="32" r="31" fill="url(#glow)"/>
+  <circle cx="32" cy="32" r="20.5" fill="url(#void)"/>
+  <circle cx="32" cy="32" r="20.5" fill="none" stroke="url(#ring)" stroke-width="3"/>
+</svg>
