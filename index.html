@@ -577,9 +577,41 @@
     ctx.restore();
   }
 
+  // A dent in the field: the visitor's hand as a small mass. Particles near it are drawn where a lens would
+  // show them, nudged outward around it (nothing moves, nothing glows; the ring and sound don't know).
+  // It forms over DENT_RISE s wherever the hand is, trails it by DENT_FOLLOW s as it moves, and flattens
+  // over DENT_LEAVE s when the hand leaves. Touch: a finger on the screen. Off under reduced motion.
+  const DENT_STRENGTH = 28, DENT_RADIUS = 150, DENT_RISE = 0.6, DENT_FOLLOW = 0.15, DENT_LEAVE = 1.2;
+  const dent = { x: 0, y: 0, tx: 0, ty: 0, m: 0, on: false };
+  if (!reduced) {
+    const at = (e) => {
+      if (!dent.on) { dent.x = e.clientX; dent.y = e.clientY; }   // arrive where the hand is, don't sweep in from the last spot
+      dent.tx = e.clientX; dent.ty = e.clientY; dent.on = true;
+    };
+    addEventListener('pointermove', (e) => { if (e.pointerType !== 'touch' || e.buttons) at(e); }, { passive: true });
+    addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') at(e); }, { passive: true });
+    addEventListener('pointerup', (e) => { if (e.pointerType === 'touch') dent.on = false; }, { passive: true });
+    addEventListener('pointercancel', () => { dent.on = false; }, { passive: true });
+    document.documentElement.addEventListener('pointerleave', () => { dent.on = false; }, { passive: true });
+    addEventListener('blur', () => { dent.on = false; });
+  }
+  function settleDent(dt) {
+    const f = 1 - Math.exp(-dt / DENT_FOLLOW);   // the dent trails the hand a little, like a mass
+    dent.x += (dent.tx - dent.x) * f; dent.y += (dent.ty - dent.y) * f;
+    const tau = dent.on ? DENT_RISE / 3 : DENT_LEAVE / 3;
+    dent.m += ((dent.on ? 1 : 0) - dent.m) * (1 - Math.exp(-dt / tau));
+    if (dent.m < 0.001) dent.m = 0;
+  }
+  // The apparent shift (px) of a point at (x, y): outward from the dent, largest a little inside DENT_RADIUS.
+  function lens(x, y) {
+    const dx = x - dent.x, dy = y - dent.y, d = Math.hypot(dx, dy) || 1, q = d / DENT_RADIUS;
+    const k = (DENT_STRENGTH * dent.m * q * Math.exp(-q * q)) / d;
+    return [dx * k, dy * k];
+  }
   function drawPoints() {
     for (const p of points) {
-      const x = cx + Math.cos(p.a) * p.rad, y = cy + Math.sin(p.a) * p.rad;
+      let x = cx + Math.cos(p.a) * p.rad, y = cy + Math.sin(p.a) * p.rad;
+      if (dent.m && Math.abs(x - dent.x) < 3 * DENT_RADIUS && Math.abs(y - dent.y) < 3 * DENT_RADIUS) { const [lx, ly] = lens(x, y); x += lx; y += ly; }
       let t = Math.min(1, Math.max(0, 1 - (p.rad - r) / (p.born - r)));
       t = t * t;              // most of the warming happens near the ring
       const edge = Math.min(1, Math.max(0, (p.rad - r - 6) / 10));   // the last few px: gone into the glow
@@ -612,6 +644,7 @@
     vis.lift += (lt - vis.lift) * (1 - Math.exp(-dt / tau)); if (vis.lift < 0.001) vis.lift = 0;
     if (flow) { flowY = flow.at(now, dt); verseEl.style.transform = `translateY(${flowY.toFixed(2)}px)`; }
     step(dt);
+    settleDent(dt);
     drawPoints();
     drawRing(1, now - t0);
     humTick(now);
@@ -703,6 +736,10 @@
   const SWELL = 4, LEVEL = 2.0;                                          // which voice the hot spots lean on; master ceiling
   const btn = document.getElementById('hum'), hint = document.getElementById('hum-hint');
   const debug = location.hash === '#humdebug';
+  if (debug) window.__field = {   // for checks: the dent, and the mean drawn shift of the particles within DENT_RADIUS of it
+    dent, constants: { DENT_STRENGTH, DENT_RADIUS, DENT_RISE, DENT_FOLLOW, DENT_LEAVE },
+    sample() { let n = 0, sum = 0, max = 0; for (const p of points) { const x = cx + Math.cos(p.a) * p.rad, y = cy + Math.sin(p.a) * p.rad; if (Math.hypot(x - dent.x, y - dent.y) < DENT_RADIUS) { const v = Math.hypot(...lens(x, y)); n++; sum += v; max = Math.max(max, v); } } return { n, mean: n ? sum / n : 0, max, m: dent.m }; },
+  };
   const PULSE_HZ = (ROOT * 2) / 1024;
   let pulseT0 = 0;
   // What the ring is allowed to know: where the pulse is (0–1), scaled by how present the sound is.
