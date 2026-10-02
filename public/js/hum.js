@@ -652,9 +652,9 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// Leaving through the footer: let the hum fall away before the next page. New-tab clicks go straight through.
+// Leaving through a door (studio, works): let the hum fall away before the next page. New-tab clicks go straight through.
 const LEAVE_FADE = 0.6;
-document.querySelectorAll('.foot a').forEach((a) => a.addEventListener('click', (e) => {
+document.querySelectorAll('.ways a').forEach((a) => a.addEventListener('click', (e) => {
   if (!graph || !on || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   e.preventDefault();
   ramp(0, LEAVE_FADE);

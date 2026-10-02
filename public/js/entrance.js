@@ -196,7 +196,7 @@ addEventListener('wheel', (e) => {
 // behave as before. Outside the ring only.
 addEventListener('pointerdown', (e) => {
   if (root.matches('.entering, .opening, .pacing, .leaving')) return;
-  if (e.target.closest && e.target.closest('button, a, .head, .door, .foot')) return;
+  if (e.target.closest && e.target.closest('button, a, .head, .door, .ways')) return;
   const d = Math.hypot(e.clientX - cx, e.clientY - cy) - r;
   if (d <= 12) return;
   const u = d / Math.max(1, maxR - r);

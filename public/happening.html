@@ -35,8 +35,9 @@
     --verse-size: 22px;
     --verse-lh: 1.6;
     --verse-w: min(80vw, 420px);
-    --footer-h: 44px;
+    --footer-h: 44px;   /* a door's tap height */
     --footer-gap: 28px;
+    --door-in: 84px;   /* a door's centre, inside the rim */
     /* The reset's draw-in: the verse falls into the void, faster and faster all the way to the centre
        (ease-in cubic), fading on the same curve. It goes first; the void follows DRAWIN_LEAD later. */
     --draw-in-ease: cubic-bezier(0.32, 0, 0.67, 0);
@@ -254,8 +255,8 @@
   }
 
   /* Verse sits in flow so a short viewport scrolls instead of clipping.
-     Symmetric padding keeps it on the viewport center when it fits; the
-     bottom pad also reserves the footer's room. */
+     Symmetric padding keeps it on the viewport center when it fits, and
+     clear of the name at the top. */
   .verse-wrap {
     position: relative;
     z-index: 1;
@@ -286,31 +287,51 @@
     clip-path: inset(50%); white-space: nowrap;
   }
 
-  .foot {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 1;
-    padding-bottom: calc(var(--footer-gap) + env(safe-area-inset-bottom, 0px));
-    display: flex;
-    justify-content: center;
-  }
-  .foot a {
-    display: inline-flex;
-    align-items: center;
-    min-height: var(--footer-h);
-    padding: 0 12px;
+  /* The ways onward: studio and works as doors on the horizon, left and right of the verse. Wide: on the
+     ring's centre line, just inside its rim (--door-in). Phones, where the rim's sides are off-screen:
+     near the screen's edges. They arrive with the end mark and leave first with it (below). */
+  .ways a {
+    position: fixed; top: 50%; z-index: 2;   /* above the verse's flow, so the doors take the tap */
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 44px; min-height: var(--footer-h); padding: 0 12px; box-sizing: border-box;
+    transform: translate(-50%, -50%);
     font-family: "Newsreader", Georgia, serif;
     font-style: italic;
     font-weight: 300;
     font-size: 14px;
-    color: var(--ink-dim);
-    opacity: 0.75;
+    gap: 7px;
+    color: #b9b0da;   /* partway from the footer's dim toward the verse's lavender: present, not loud */
+    opacity: 0.85;
     text-decoration: none;
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
     transition: color 300ms ease, opacity 300ms ease;
   }
-  .foot a:hover, .foot a:focus-visible {
+  /* A fine outward caret: this way out. It leans further out on hover. */
+  .way-arrow {
+    width: 6px; height: 10px; flex: none;
+    fill: none; stroke: currentColor; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round;
+    opacity: 0.6; transition: transform 300ms ease, opacity 300ms ease;
+  }
+  .ways a:hover .way-arrow, .ways a:focus-visible .way-arrow { opacity: 1; }
+  .ways .way-studio:hover .way-arrow, .ways .way-studio:focus-visible .way-arrow { transform: translateX(-3px); }
+  .ways .way-works:hover .way-arrow, .ways .way-works:focus-visible .way-arrow { transform: translateX(3px); }
+  /* The word leans out too, a little less than its mark. */
+  .ways a span { display: inline-block; transition: transform 300ms ease; }
+  .ways .way-studio:hover span, .ways .way-studio:focus-visible span { transform: translateX(-2px); }
+  .ways .way-works:hover span, .ways .way-works:focus-visible span { transform: translateX(2px); }
+  @media (prefers-reduced-motion: reduce) {
+    .way-arrow { transition: none; }
+    .ways a:hover .way-arrow, .ways a:focus-visible .way-arrow { transform: none; }
+    .ways a span { transition: none; }
+    .ways a:hover span, .ways a:focus-visible span { transform: none; }
+  }
+  .ways .way-studio { left: calc(50% - var(--d) / 2 + var(--door-in)); }
+  .ways .way-works { left: calc(50% + var(--d) / 2 - var(--door-in)); }
+  @media (max-width: 700px) {
+    .ways .way-studio { left: calc(env(safe-area-inset-left, 0px) + 20px); transform: translateY(-50%); }
+    .ways .way-works { left: auto; right: calc(env(safe-area-inset-right, 0px) + 20px); transform: translateY(-50%); }
+  }
+  .ways a:hover, .ways a:focus-visible {
     color: var(--ink);
     opacity: 1;
     outline: none;
@@ -330,9 +351,30 @@
   .verse-reset svg { display: block; width: 10px; height: 10px; }
   /* Hidden at the door, while the entrance runs (.quiet-mark: until 1.5 s after the void is full), and
      first to go on the reset. It arrives slowly (.mark-in), the last thing. */
-  .entering .verse-reset, .opening .verse-reset, .quiet-mark .verse-reset { visibility: hidden; opacity: 0; }
+  .entering .verse-reset, .opening .verse-reset, .quiet-mark .verse-reset,
+  .entering .ways a, .opening .ways a, .quiet-mark .ways a { visibility: hidden; opacity: 0; }
   .leaving .verse-reset { visibility: hidden; opacity: 0; transition: opacity 0.25s ease, visibility 0s linear 0.25s; }
-  .mark-in .verse-reset { transition: opacity 1.5s ease; }
+  /* On the reset the doors fall in with the verse: drawn toward the centre, shrinking and fading, on its ease. */
+  .ways { --inward: calc(var(--d) / 2 - var(--door-in)); }
+  .leaving .ways a {
+    visibility: hidden; opacity: 0;
+    transition: transform var(--draw-in-time) var(--draw-in-ease), opacity var(--draw-in-time) var(--draw-in-fade),
+      visibility 0s linear var(--draw-in-time);
+  }
+  .leaving .ways .way-studio { transform: translate(calc(-50% + var(--inward)), -50%) scale(0.2); }
+  .leaving .ways .way-works { transform: translate(calc(-50% - var(--inward)), -50%) scale(0.2); }
+  @media (max-width: 700px) {
+    .ways { --inward: calc(50vw - 64px); }
+    .leaving .ways .way-studio { transform: translate(var(--inward), -50%) scale(0.2); }
+    .leaving .ways .way-works { transform: translate(calc(-1 * var(--inward)), -50%) scale(0.2); }
+  }
+  .mark-in .verse-reset, .mark-in .ways a { transition: opacity 1.5s ease; }
+  @media (prefers-reduced-motion: reduce) {
+    .ways a, .mark-in .ways a, .leaving .ways a { transition: none; }
+    .leaving .ways .way-studio, .leaving .ways .way-works { transform: none; }
+    @media (min-width: 701px) { .leaving .ways .way-studio, .leaving .ways .way-works { transform: translate(-50%, -50%); } }
+    @media (max-width: 700px) { .leaving .ways .way-studio, .leaving .ways .way-works { transform: translateY(-50%); } }
+  }
   /* After the tap that enters, the mouse pointer goes quiet until it moves. */
   html.cursor-hidden, html.cursor-hidden * { cursor: none !important; }
 </style>
@@ -377,10 +419,10 @@
   </div>
 </main>
 
-<footer class="foot">
-  <a href="https://thehum.studio" aria-label="thehum.studio">studio</a>
-  <a href="https://thehum.works" aria-label="thehum.works">works</a>
-</footer>
+<nav class="ways" aria-label="Onward">
+  <a class="way-studio" href="https://thehum.studio" aria-label="thehum.studio"><svg class="way-arrow" viewBox="0 0 6 10" aria-hidden="true"><path d="M5 1 1 5l4 4"/></svg><span>studio</span></a>
+  <a class="way-works" href="https://thehum.works" aria-label="thehum.works"><span>works</span><svg class="way-arrow" viewBox="0 0 6 10" aria-hidden="true"><path d="M1 1l4 4-4 4"/></svg></a>
+</nav>
 
 <script type="module" src="js/main.js"></script>
 </body>
