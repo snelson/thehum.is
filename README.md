@@ -1,6 +1,6 @@
 # thehum.is
 
-The philosophical root of The Hum. One page (`public/index.html`), served by
+The philosophical root of The Hum. One page (`public/happening.html`, served at thehum.is/happening; `/` redirects there), served by
 a Cloudflare Worker with static assets (`wrangler.jsonc`) at thehum.is and
 www. Workers Builds deploys `main`, so a push to `main` publishes; other
 branches get preview URLs.

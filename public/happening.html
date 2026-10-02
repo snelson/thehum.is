@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="description" content="Nothing. Something. No thing, some thing. The original beat. Became sound. Light. Form.">
 <meta name="theme-color" content="#0b0a14">
-<link rel="canonical" href="https://thehum.is/">
+<link rel="canonical" href="https://thehum.is/happening">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon.ico" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<meta property="og:title" content="The Hum">
+<meta property="og:title" content="The Hum is happening">
 <meta property="og:description" content="Everything is this. Still enough to hear that it becomes through us.">
-<meta property="og:url" content="https://thehum.is/">
+<meta property="og:url" content="https://thehum.is/happening">
 <title>The Hum</title>
 <script>try { if (!localStorage.getItem('hum.entered') && !localStorage.getItem('hum.heard')) document.documentElement.classList.add('entering'); } catch (e) {}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1341,6 +1341,7 @@
     on = !on;
     btn.setAttribute('aria-pressed', String(on));
     btn.setAttribute('aria-label', on ? 'Turn the hum off' : 'Turn the hum on');
+    document.title = on ? 'The Hum is happening' : 'The Hum';   // the tab says so while it sounds
     clearTimeout(hintTimer);
     if (on) {
       enable(); remember();
