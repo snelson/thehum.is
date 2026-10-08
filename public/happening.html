@@ -351,14 +351,16 @@
     display: inline-flex; align-items: center;
     min-height: var(--footer-h); padding: 0 12px 0 calc(12px + 0.38em);   /* balances the trailing tracking */
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    font-weight: 500; font-size: var(--inscription-size);
+    font-weight: 500; font-size: calc(var(--inscription-size) - 2px);
     letter-spacing: 0.38em; text-transform: uppercase;
-    color: var(--ink-dim); opacity: 0.6;
+    color: var(--ink-dim); opacity: 0.45;
     text-decoration: none;
     -webkit-tap-highlight-color: transparent; touch-action: manipulation;
-    transition: color 300ms ease, opacity 300ms ease;
+    transition: opacity 300ms ease;
   }
-  .foot a:hover, .foot a:focus-visible { color: var(--ink); opacity: 1; outline: none; }
+  /* The name's hover: only brighter, no colour change. */
+  .foot a:hover, .foot a:focus-visible { opacity: 0.95; outline: none; }
+  .foot a:focus-visible span { outline: 1px solid rgba(180,140,255,0.6); outline-offset: 5px; border-radius: 2px; }
   /* Reset: a small turning arrow under the verse, its end mark, easy to miss. Brings the entrance back.
      It hangs below the verse without taking room, so the verse's centring is the verse's alone. */
   .verse { position: relative; }
@@ -493,7 +495,7 @@
 </nav>
 
 <footer class="foot">
-  <a href="https://thehum.ing" aria-label="thehum.ing: just the hum">Just the hum.ing</a>
+  <a href="https://thehum.ing" aria-label="thehum.ing: just the hum"><span>Just the hum.ing</span></a>
 </footer>
 
 <script type="module" src="js/main.js"></script>
