@@ -338,6 +338,27 @@
     opacity: 1;
     outline: none;
   }
+  /* The foot: thehum.ing, the hum with nothing else. It frames the page from the bottom edge as the name
+     does from the top, in the name's type; not a door. It comes and goes with the doors. */
+  .foot {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 2;
+    padding-bottom: calc(var(--footer-gap) + env(safe-area-inset-bottom, 0px));
+    display: flex; justify-content: center;
+    pointer-events: none;
+  }
+  .foot a {
+    pointer-events: auto;
+    display: inline-flex; align-items: center;
+    min-height: var(--footer-h); padding: 0 12px 0 calc(12px + 0.38em);   /* balances the trailing tracking */
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-weight: 500; font-size: var(--inscription-size);
+    letter-spacing: 0.38em; text-transform: uppercase;
+    color: var(--ink-dim); opacity: 0.6;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    transition: color 300ms ease, opacity 300ms ease;
+  }
+  .foot a:hover, .foot a:focus-visible { color: var(--ink); opacity: 1; outline: none; }
   /* Reset: a small turning arrow under the verse, its end mark, easy to miss. Brings the entrance back.
      It hangs below the verse without taking room, so the verse's centring is the verse's alone. */
   .verse { position: relative; }
@@ -354,7 +375,10 @@
   /* Hidden at the door, while the entrance runs (.quiet-mark: until 1.5 s after the void is full), and
      first to go on the reset. It arrives slowly (.mark-in), the last thing. */
   .entering .verse-reset, .opening .verse-reset, .quiet-mark .verse-reset,
-  .entering .ways a, .opening .ways a, .quiet-mark .ways a { visibility: hidden; opacity: 0; }
+  .entering .ways a, .opening .ways a, .quiet-mark .ways a,
+  .entering .foot a, .opening .foot a, .quiet-mark .foot a { visibility: hidden; opacity: 0; }
+  .mark-in .foot a { transition: opacity 1.5s ease; }
+  .leaving .foot a, .diving .foot a { visibility: hidden; opacity: 0; transition: opacity 0.4s ease, visibility 0s linear 0.4s; }
   .leaving .verse-reset { visibility: hidden; opacity: 0; transition: opacity 0.25s ease, visibility 0s linear 0.25s; }
   /* On the reset the doors fall in with the verse: drawn toward the centre, shrinking and fading, on its ease. */
   .ways { --inward: calc(var(--d) / 2 - var(--door-in)); }
@@ -467,6 +491,10 @@
   <a class="way-studio" href="https://thehum.studio" aria-label="thehum.studio"><svg class="way-arrow" viewBox="0 0 6 10" aria-hidden="true"><path d="M5 1 1 5l4 4"/></svg><span>studio</span></a>
   <a class="way-works" href="https://thehum.works" aria-label="thehum.works"><span>works</span><svg class="way-arrow" viewBox="0 0 6 10" aria-hidden="true"><path d="M1 1l4 4-4 4"/></svg></a>
 </nav>
+
+<footer class="foot">
+  <a href="https://thehum.ing" aria-label="thehum.ing: just the hum">Just the hum.ing</a>
+</footer>
 
 <script type="module" src="js/main.js"></script>
 </body>
