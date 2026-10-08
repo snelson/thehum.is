@@ -281,7 +281,7 @@ function go(href) {
   if (location.hash === '#humdebug' && window.__holdNav) { window.__navs = (window.__navs || 0) + 1; window.__navTo = href; window.__navAt = performance.now(); return; }
   location.href = href;
 }
-document.querySelectorAll('.ways a').forEach((a) => a.addEventListener('click', (e) => {
+document.querySelectorAll('.ways a, .foot a').forEach((a) => a.addEventListener('click', (e) => {   // the foot leaves the same way
   if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   e.preventDefault();
   if (diving) return;
@@ -299,7 +299,7 @@ addEventListener('pageshow', (e) => {   // back from the next page: as it was be
   if (!e.persisted || !diving) return;
   diving = false;
   root.classList.remove('diving', 'dark');
-  document.querySelectorAll('.ways a.chosen').forEach((x) => x.classList.remove('chosen'));
+  document.querySelectorAll('.ways a.chosen, .foot a.chosen').forEach((x) => x.classList.remove('chosen'));
   snapTo(1);
 });
 
