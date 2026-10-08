@@ -380,7 +380,10 @@
   .entering .ways a, .opening .ways a, .quiet-mark .ways a,
   .entering .foot a, .opening .foot a, .quiet-mark .foot a { visibility: hidden; opacity: 0; }
   .mark-in .foot a { transition: opacity 1.5s ease; }
-  .leaving .foot a, .diving .foot a { visibility: hidden; opacity: 0; transition: opacity 0.4s ease, visibility 0s linear 0.4s; }
+  .leaving .foot a, .diving .foot a:not(.chosen) { visibility: hidden; opacity: 0; transition: opacity 0.4s ease, visibility 0s linear 0.4s; }
+  /* Taken, it leaves as a door does: it brightens at once, holds, and fades through the dive. */
+  .diving .foot a.chosen { animation: foot-chosen var(--dive-time) linear both; }
+  @keyframes foot-chosen { 0% { opacity: 0.55; } 9% { opacity: 0.95; } 55% { opacity: 0.8; } 100% { opacity: 0; } }
   .leaving .verse-reset { visibility: hidden; opacity: 0; transition: opacity 0.25s ease, visibility 0s linear 0.25s; }
   /* On the reset the doors fall in with the verse: drawn toward the centre, shrinking and fading, on its ease. */
   .ways { --inward: calc(var(--d) / 2 - var(--door-in)); }
@@ -433,6 +436,7 @@
   @media (prefers-reduced-motion: reduce) {
     .diving .verse-wrap, .diving .head, .diving .verse-reset, .diving .ways a { transform: none; transition: opacity 0.3s ease; }
     .diving .ways a.chosen { animation: none; opacity: 1; transition: none; }   /* an instant brightening, no jump */
+    .diving .foot a.chosen { animation: none; opacity: 0.95; }
     .diving .ways .way-studio.chosen .way-arrow, .diving .ways .way-works.chosen .way-arrow { transform: none; transition: none; }
     @media (min-width: 701px) { .diving .ways .way-studio, .diving .ways .way-works { transform: translate(-50%, -50%); } }
     @media (max-width: 700px) { .diving .ways .way-studio, .diving .ways .way-works { transform: translateY(-50%); } }
