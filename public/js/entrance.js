@@ -1,126 +1,63 @@
-// The way in: the door, the paced verse (its clock, streaming, drift), the name and the end mark, the
-// skip and its guards (#10), the field taps' input, and the reset.
+// The way in: the door, the verse a line at a time (its clock and cues), the mark it settles on, the skip
+// and its guards (#10), the field taps' input, and the reset. And the way out: the dive.
 import {
-  reduced, voidEl, verseEl, cx, cy, r, maxR, SHUT, bezier, swing, aperture, CLOSE_MS, DRAWIN_LEAD, expoInOut,
-  addTap, clock, cue, flowY, snapTo, clearCues, setFlow, flare,
+  reduced, voidEl, cx, cy, r, maxR, SHUT, bezier, swing, aperture, CLOSE_MS, DRAWIN_LEAD, expoInOut,
+  addTap, clock, cue, snapTo, clearCues, flare, lift,
 } from './field.js';
-import { btn, on, graph, tearDown, destroy, tapTone, setAimTuneIn, diveFade, diveFall } from './hum.js';
 
 // ---- The way in ------------------------------------------------------------
-// The circle enters with the hum on, through the header's own switch; "silently" enters with
-// it off. Either way the entrance is remembered. The reset under the links runs it backwards.
+// The door enters; the entrance is remembered. The end mark at the foot runs it backwards, to the door.
 const root = document.documentElement, door = document.querySelector('.door'), reset = document.querySelector('.verse-reset');
-const lines = document.querySelectorAll('.verse p > span');
-// The verse at reading pace, on the entrance only. Each number is the pause, in seconds, before
-// its line starts to fade in; the first counts from the tap. Tune by ear.
-const PACE = [
-  2.4,   // Nothing.                          as the void settles
-  1.5,   // Something.
-  1.7,   // No thing, some thing.             a little room
-  2.2,   // The original beat.                its own breath (room after the long comma above)
-  2.1,   // Became sound.                     a held beat after the origin, then the change
-  1.8,   // Light.                            held
-  1.9,   // Form.                             held
-  2.6,   // Everything is this.               held after "Form.", a breath at the stanza break
-  1.8,   // Still enough to hear              its own breath
-  1.4,   // that it becomes                   close behind: one sentence across the lines
-  2.6,   // through us.                       held: the arrival (~23 s)
+const mark = document.querySelector('.mark');
+const lines = [...document.querySelectorAll('.verse p > span')];
+const breaks = new Set([...document.querySelectorAll('.verse p + p > span:first-child')].map((l) => lines.indexOf(l)));
+// The verse at reading pace, one line on screen at once, at the void's centre. A line comes in (IN s, the
+// CSS's --line-in), holds (its HOLD, s), goes (OUT s, --line-out), and GAP s later the next comes in; the
+// stanza break is a longer breath (BREAK s more). The first line comes in FIRST s after the tap. Tune by ear.
+const css = (k, d) => parseFloat(getComputedStyle(root).getPropertyValue(k)) || d;
+const IN = css('--line-in', 0.9), OUT = css('--line-out', 0.7), MARK_IN = css('--mark-in', 1.8);
+const FIRST = 2.0, GAP = 0.15, BREAK = 0.8;
+const HOLD = [
+  1.1,   // Nothing.                          as the void opens
+  1.0,   // Something.
+  1.6,   // No thing, some thing.
+  1.4,   // The original beat.
+  1.2,   // Became sound.
+  0.9,   // Light.
+  1.0,   // Form.
+  1.4,   // Everything is this.               after the stanza's breath
+  1.3,   // Still enough to hear
+  1.0,   // that it becomes                   close behind: one sentence across the lines
+  1.9,   // through us.                       held: the arrival
 ];
-// A comma's beat inside a line, where it differs from COMMA_MS (ms, by line index). Tune by ear.
-const COMMA_BEAT = {
-  2: 600,   // No thing, | some thing.
-};
-const landing = () => PACE.reduce((a, p) => a + p, 0) + FADE;   // the void full, the verse landed: s after the tap
-const FADE = 1.2;   // a line's arrival: its row opens (0.9 s) and its letters stream and fade in
-// Within a line: a beat per letter (spaces too), a longer one after a comma or a full stop.
-const LETTER_MS = 50, COMMA_MS = 150, STOP_MS = 250;
-const beat = (c, n) => LETTER_MS + (c === ',' ? (COMMA_BEAT[n] ?? COMMA_MS) : c === '.' ? STOP_MS : 0);
-// The void grows with the verse: from the tap, one slow curve from the door's third to full, landing
-// as the last line finishes its fade (so retuning PACE moves it too). Quick enough at first to hold
-// "Nothing." with room, steady through the middle, a soft settle; it stays ahead of the opening rows.
+// When each line comes in and starts to go (s after the tap), and when the mark comes in: MARK_PAUSE s
+// after the last line has gone. landing(): the mark in and the void full (the hum aimed at it, when it had one).
+const MARK_PAUSE = 0.6;
+const plan = (() => {
+  let t = FIRST;
+  return lines.map((_, i) => {
+    if (breaks.has(i)) t += BREAK;
+    const on = t, off = t + IN + (HOLD[i] ?? 1.4);
+    t = off + OUT + GAP;
+    return { on, off };
+  });
+})();
+const markAt = plan[plan.length - 1].off + OUT + MARK_PAUSE;
+const landing = () => markAt + MARK_IN * 0.6;
+// The void grows with the verse: from the tap, one slow curve from the door's third to full, landing as
+// the mark comes in (so retuning HOLD moves it too). Quick enough at first to hold "Nothing." with room.
 const GROW_EASE = bezier(0.2, 0.25, 0.6, 1);
-const SKIP_MS = 800, SKIP_EASE = bezier(0.42, 0, 0.58, 1);   // a skip: the rows' ease-in-out
-let armed = false, swallow = false, swallowTimer = 0, refocus = false;
-// While pacing, each line is letters for the eye (aria-hidden) and its whole text for the ear.
-// Measured once, at the start: the line's width and how far each letter reaches, so the
-// letters can sit where they end up and slide by half of what's still to come.
-const texts = [...lines].map((l) => l.firstElementChild.textContent);
-let streams = [];
-function split() {
-  streams = [...lines].map((l, n) => {
-    const box = l.firstElementChild, text = texts[n];
-    const sr = document.createElement('span'), ink = document.createElement('span');
-    sr.className = 'sr'; sr.textContent = text;
-    ink.className = 'ink'; ink.setAttribute('aria-hidden', 'true');
-    const chs = [...text].map((c) => { const ch = document.createElement('span'); ch.className = 'ch'; ch.textContent = c; return ch; });
-    ink.append(...chs); box.replaceChildren(sr, ink);
-    const r = ink.getBoundingClientRect();
-    let reach = 0;   // a space reaches no further than the letter before it
-    const ends = chs.map((ch, i) => (text[i] === ' ' ? reach : (reach = ch.getBoundingClientRect().right - r.left)));
-    ink.style.transform = `translateX(${r.width / 2}px)`;
-    return { ink, chs, ends, w: r.width, text };
-  });
-}
-function unsplit() { lines.forEach((l, n) => { l.firstElementChild.textContent = texts[n]; }); streams = []; }
-function stream(n) {
-  const { ink, chs, ends, w, text } = streams[n];
-  let t = 0;
-  chs.forEach((ch, i) => {
-    cue(() => { ch.classList.add('on'); ink.style.transform = `translateX(${(w - ends[i]) / 2}px)`; }, t);
-    t += beat(text[i], n);
-  });
-}
-// The drift: the verse keeps what's visible close to the centre. "Nothing." arrives at the centre and
-// holds. Each later line's place is made ahead of it: from LEAD s before it starts (never before the
-// line above has begun its last letter) the verse glides to centre the lines with it, pre-shifting at
-// most half a line, so what's visible stays within half a line of the centre and a line usually streams
-// into place without moving. A bigger step (the stanza gap) finishes over POST s as its line streams.
-// A light critically damped follow (SMOOTH s) rounds the joins; no overshoot. Whatever's left after the
-// last line starts eases out, so the verse lands in place as the void reaches full.
-const LEAD = 0.9, POST = 0.6, SMOOTH = 0.12;
-const lastLetter = (n) => [...texts[n]].slice(0, -1).reduce((a, c) => a + beat(c, n), 0) / 1000;
-const rowsNow = () => [...lines].map((l) => { const r = l.getBoundingClientRect(); return [r.top - flowY, r.bottom - flowY]; });
-const centring = (rows, k) => innerHeight / 2 - (rows[0][0] + rows[k][1]) / 2;
-const smooth = (p) => { p = Math.min(1, Math.max(0, p)); return p * p * (3 - 2 * p); };
-function follow(t0, end) {
-  const rows = rowsNow(), half = (rows[0][1] - rows[0][0]) / 2;
-  const starts = PACE.map((p, i) => PACE.slice(0, i + 1).reduce((a, b) => a + b, 0));
-  const leads = starts.map((s0, i) => (i ? s0 - Math.min(LEAD, s0 - starts[i - 1] - lastLetter(i - 1)) : s0));
-  const c = starts.map((s0, k) => centring(rows, k));
-  const pre = c.map((ck, k) => (k ? Math.max(-half, Math.min(half, ck - c[k - 1])) : 0));   // the part made ahead
-  const lastAt = starts[starts.length - 1], w = 1 / SMOOTH;
-  const target = (t) => {
-    let k = 0; while (k + 1 < starts.length && t >= starts[k + 1]) k++;
-    const n = k + 1;
-    if (n < starts.length && t >= leads[n]) return c[k] + pre[n] * smooth((t - leads[n]) / (starts[n] - 0.15 - leads[n]));   // made just before it starts
-    if (k && t < starts[k] + POST) return c[k - 1] + pre[k] + (c[k] - c[k - 1] - pre[k]) * smooth((t - starts[k]) / POST);
-    return c[k];
-  };
-  let x = c[0], v = 0;
-  return { at(now, dt) {
-    const t = (now - t0) / 1000;
-    if (t < leads[1]) return x;
-    v += (w * w * (target(t) - x) - 2 * w * v) * dt; x += v * dt;
-    const e = t <= lastAt ? 0 : Math.min(1, (t - lastAt) / (end - lastAt));
-    return x * (1 - e * e * (3 - 2 * e));
-  } };
-}
-// A skip: from wherever the verse is to `to`, on the void's own way from here to `apTo`.
-function tie(to, apTo) {
-  const from = flowY, ap0 = aperture;
-  return { at() { const f = apTo === ap0 ? 1 : Math.min(1, Math.max(0, (aperture - ap0) / (apTo - ap0))); return from + (to - from) * f; } };
-}
-function halt() { clearCues(); armed = false; }
+const SKIP_MS = 800, SKIP_EASE = bezier(0.42, 0, 0.58, 1);   // a skip: the void to full on an ease-in-out
+// Then the end mark, the doors and the mark's way come in, MARK_AFTER s after the mark.
+const MARK_AFTER = 1.2;
+let armed = false, swallow = false, swallowTimer = 0, refocus = false, readTimer = 0;
+const show = (i) => lines.forEach((l, n) => l.classList.toggle('on', n === i));
+function halt() { clearCues(); clearTimeout(readTimer); armed = false; }
 function unpace() {
   halt();
-  root.classList.remove('pacing', 'skipped', 'landed');
-  setFlow(null, 0); verseEl.style.transform = '';
-  unsplit();
+  root.classList.remove('pacing', 'skipped', 'marked', 'reading', 'read-out');
+  show(-1);
 }
-// The close: once the last line has landed and the void is full, a pause (HEAD_PAUSE s), then the name
-// rises in at the top (HEAD_RISE s, as .landed in the CSS), then the end mark (the reset) fades in
-// MARK_AFTER s after the name has landed. A skip runs it without the pause.
-const HEAD_PAUSE = 1.2, HEAD_RISE = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--head-rise-time')) || 1.8, MARK_AFTER = 1.0;
 let markTimer = 0;
 function markLater(secs) {
   clearTimeout(markTimer);
@@ -129,25 +66,27 @@ function markLater(secs) {
     markTimer = setTimeout(() => root.classList.remove('mark-in'), 1600);
   }, secs * 1000);
 }
-function land() {   // the name comes back at the top
-  root.classList.add('landed');
-  if (refocus) { refocus = false; btn.focus({ preventScroll: true }); }
+function settle() {   // the mark comes in and stays
+  root.classList.add('marked');
+  if (refocus) { refocus = false; mark.focus({ preventScroll: true }); }
 }
 function pace() {
-  const end = landing();
-  root.classList.add('pacing');
-  split();   // after .pacing, so the letters are born hidden (no fade-out from a first, plain style)
-  setFlow(follow(clock, end));
-  swing(1, clock, end * 1000, GROW_EASE);
-  let at = 0;
-  lines.forEach((l, i) => {
-    at += PACE[i] || 0;
-    cue(() => { armed = true; stream(i); }, at * 1000);
+  root.classList.add('pacing', 'quiet-mark');
+  swing(1, clock, landing() * 1000, GROW_EASE);
+  plan.forEach(({ on, off }, i) => {
+    cue(() => { armed = true; show(i); }, on * 1000);
+    cue(() => show(-1), off * 1000);
   });
-  const landed = Math.max(end, at + lastLetter(lines.length - 1) + 0.4), named = landed + HEAD_PAUSE;
-  cue(land, named * 1000);
-  root.classList.add('quiet-mark');
-  cue(() => { unpace(); markLater(MARK_AFTER - 0.2); }, (named + HEAD_RISE + 0.2) * 1000);
+  cue(settle, markAt * 1000);
+  cue(() => { armed = false; markLater(MARK_AFTER); }, markAt * 1000 + 1);
+  cue(() => root.classList.remove('pacing'), (markAt + MARK_IN + 0.2) * 1000);
+}
+// Reduced motion: the verse whole and still (.reading), for as long as the lines would have taken or until
+// a tap or a key, then one crossfade (.read-out, 0.8 s) to the mark. Timers, not cues: no frames run.
+function read() {
+  root.classList.add('reading', 'quiet-mark');
+  armed = true;
+  readTimer = setTimeout(skip, markAt * 1000);
 }
 // Never trap a reader: once the first line is up, a tap, a wheel or a key shows the rest. Only what the
 // visitor does counts: not a modifier on its own or a shortcut (Cmd-Tab away), not a trackpad's momentum
@@ -155,20 +94,20 @@ function pace() {
 // page also scrolls when a phone turns or its toolbar folds).
 function skip() {
   if (!armed) return false;
-  armed = false;
   halt();
-  root.classList.add('skipped');
-  for (const { ink, chs } of streams) {   // the streaming line glides to rest; lines yet to come just appear there
-    if (!chs[0].classList.contains('on')) ink.style.transition = 'none';
-    chs.forEach((ch) => ch.classList.add('on')); ink.style.transform = '';
+  if (root.classList.contains('reading')) {
+    root.classList.add('read-out');
+    readTimer = setTimeout(() => { root.classList.remove('reading', 'read-out'); markLater(0.6); }, 800);
+    return true;
   }
-  setFlow(tie(0, 1));
-  markLater(SKIP_MS / 1000 + MARK_AFTER);   // the name rises over the skip's 0.8 s (CSS), then the mark
-  land(); swing(1, clock, SKIP_MS, SKIP_EASE);   // with the void to full and the name back
-  cue(unpace, FADE * 1000);   // lets any line mid-fade finish its own
+  root.classList.add('skipped');
+  show(-1);
+  swing(1, clock, SKIP_MS, SKIP_EASE);   // the void to full; the line goes (0.4 s), then the mark
+  cue(settle, 400);
+  cue(() => { markLater(MARK_AFTER); root.classList.remove('pacing', 'skipped'); }, 400 + MARK_IN * 1000);
   return true;
 }
-// The tap that skips is spent on it: it doesn't also flip the hum or follow a link. Same for
+// The tap that skips is spent on it: it doesn't also follow a link. Same for
 // Enter or Space on a focused control. The reset is left alone; it takes the verse down itself.
 addEventListener('pointerdown', (e) => {
   if (reset.contains(e.target) || !skip()) return;
@@ -192,15 +131,12 @@ addEventListener('wheel', (e) => {
   if (!wheelEarly && (e.deltaX || e.deltaY)) skip();
 }, { passive: true });
 // A tap in the field, once entered (during the entrance a tap skips; at the door nothing new): a point
-// where it landed, and, with the hum on, its tone. Taps on the name, links, the end mark or any button
-// behave as before. Outside the ring only.
+// where it landed. Taps on the mark, links, the end mark or any button behave as before. Outside the ring only.
 addEventListener('pointerdown', (e) => {
   if (root.matches('.entering, .opening, .pacing, .leaving, .diving')) return;
-  if (e.target.closest && e.target.closest('button, a, .head, .door, .ways')) return;
-  const d = Math.hypot(e.clientX - cx, e.clientY - cy) - r;
-  if (d <= 12) return;
-  const u = d / Math.max(1, maxR - r);
-  addTap(e.clientX, e.clientY, tapTone(e.clientX, u));
+  if (e.target.closest && e.target.closest('button, a, .door, .ways')) return;
+  if (Math.hypot(e.clientX - cx, e.clientY - cy) - r <= 12) return;
+  addTap(e.clientX, e.clientY, null);
 }, { passive: true });
 // The pointer goes quiet after the tap that enters (not on touch: there's nothing to hide), and comes
 // back on its first real move, or if the page loses focus or is hidden. Only listened for while hidden.
@@ -218,14 +154,12 @@ function hideCursor() {
   addEventListener('pointermove', moved, { passive: true }); addEventListener('blur', showCursor);
   document.addEventListener('visibilitychange', showCursor);
 }
-function enter(listen) {
+function enter() {
   if (!root.classList.contains('entering')) return;
   hideCursor();
   try { localStorage.setItem('hum.entered', '1'); } catch (e) {}
   const focused = door.contains(document.activeElement);
-  if (graph && !on) { clearTimeout(tearDown); destroy(); }   // a reset's fade still running: listen builds fresh and tunes in
-  if (listen) { setAimTuneIn(true); btn.click(); }
-  if (!reduced) pace();
+  if (reduced) read(); else pace();
   root.classList.add('opening'); root.classList.remove('entering', 'arriving');
   if (reduced) {
     root.classList.add('dark');
@@ -233,25 +167,24 @@ function enter(listen) {
   }
   setTimeout(() => {
     root.classList.remove('opening');
-    if (focused && root.matches('.pacing:not(.landed)')) refocus = true;   // the name isn't back yet: focus it when it is
-    else if (focused) btn.focus({ preventScroll: true });
+    if (focused && root.matches('.pacing:not(.marked), .reading')) refocus = true;   // the mark isn't in yet: focus it when it is
+    else if (focused) mark.focus({ preventScroll: true });
   }, reduced ? 1500 : 4000);
 }
 function leave() {
   if (root.matches('.entering, .opening, .leaving')) return;
   try { localStorage.removeItem('hum.entered'); localStorage.removeItem('hum.heard'); } catch (e) {}
   const focused = document.activeElement === reset;
-  if (on) btn.click();   // the header's own switch: the hum fades over 2 s
   clearTimeout(markTimer); root.classList.remove('mark-in');   // the end mark goes first (CSS: .leaving)
   halt(); refocus = false;
-  setFlow(null);   // the verse holds where it is and is drawn in from there
+  show(-1);   // a line still up goes with the mark
   root.classList.add('leaving');
   if (reduced) root.classList.add('dark');
-  // The verse starts falling in; DRAWIN_LEAD later the void closes after it, and the door comes back as it lands.
+  // The mark starts falling in; DRAWIN_LEAD later the void closes after it, and the door comes back as it lands.
   let back = false;
   const door_ = () => { if (back) return; back = true;
-    if (reduced) { snapTo(SHUT); root.classList.remove('dark'); }   // the hum's 2 s fade may outlast this; enter() clears it
-    unpace(); root.classList.remove('quiet-mark');   // the door: the verse back in place, unseen, for the next entrance
+    if (reduced) { snapTo(SHUT); root.classList.remove('dark'); }
+    unpace(); root.classList.remove('quiet-mark');   // the door, for the next entrance
     root.classList.add('entering', 'arriving'); root.classList.remove('leaving');
     if (focused) door.querySelector('.door-in').focus({ preventScroll: true });
     setTimeout(() => root.classList.remove('arriving'), 1200);
@@ -262,34 +195,32 @@ function leave() {
     cue(door_, DRAWIN_LEAD * 1000 + CLOSE_MS);   // as the void lands
   }
 }
-door.querySelector('.door-in').addEventListener('click', () => enter(true));
-door.querySelector('.door-quiet').addEventListener('click', () => enter(false));
+door.querySelector('.door-in').addEventListener('click', enter);
 reset.addEventListener('click', leave);
 
 // ---- The way out ----------------------------------------------------------
 // Leaving through a door dives into the void: together, over DIVE_MS and gathering speed, the void opens
 // past the screen (to DIVE_REACH times the half-diagonal, so its dark fills the corners; the ring, glow and
-// infall follow), the verse is drawn inward on the draw-in's ease, the doors fly outward, the name and the
-// end mark fade, and the hum falls away. Then the next page, once. A new-tab click goes straight through.
+// infall follow), the doors fly outward and the end mark fades; the mark fades, or, taken, swells as it goes.
+// Then the next page, once. A new-tab click goes straight through.
 // Reduced motion: a quick fade to dark (DIVE_DARK ms), then the next page. Back (from the cache): as before.
 const DIVE_MS = 1100, DIVE_REACH = 1.15, DIVE_DARK = 350, DIVE_EASE = bezier(0.7, 0, 0.84, 0);   // easeInExpo: a slow lean, then the fall
 // Then a hang in the void before the next page (DIVE_HANG ms; DIVE_HANG_REDUCED under reduced motion), the
-// field still turning, while the hum's fall reaches its depths and fades.
+// field still turning.
 const DIVE_HANG = 1100, DIVE_HANG_REDUCED = 250;
 let diving = false;
 function go(href) {
   if (location.hash === '#humdebug' && window.__holdNav) { window.__navs = (window.__navs || 0) + 1; window.__navTo = href; window.__navAt = performance.now(); return; }
   location.href = href;
 }
-document.querySelectorAll('.ways a, .foot a').forEach((a) => a.addEventListener('click', (e) => {   // the foot leaves the same way
+document.querySelectorAll('.ways a, .mark').forEach((a) => a.addEventListener('click', (e) => {   // the mark leaves the same way
   if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   e.preventDefault();
   if (diving) return;
   diving = true;
   const secs = reduced ? DIVE_DARK : DIVE_MS, hang = reduced ? DIVE_HANG_REDUCED : DIVE_HANG;
   a.classList.add('chosen');   // at once: the door brightens, its caret jumps out, the other door goes (CSS)
-  flare(); diveFall(secs / 1000, hang / 1000);
-  diveFade(secs / 1000, hang / 1000);
+  flare(); lift(null);
   root.classList.add('diving');
   if (reduced) root.classList.add('dark');
   else swing((Math.hypot(innerWidth, innerHeight) / 2 * DIVE_REACH) / (voidEl.offsetWidth / 2), clock, DIVE_MS, DIVE_EASE);
@@ -299,7 +230,7 @@ addEventListener('pageshow', (e) => {   // back from the next page: as it was be
   if (!e.persisted || !diving) return;
   diving = false;
   root.classList.remove('diving', 'dark');
-  document.querySelectorAll('.ways a.chosen, .foot a.chosen').forEach((x) => x.classList.remove('chosen'));
+  document.querySelectorAll('.ways a.chosen, .mark.chosen').forEach((x) => x.classList.remove('chosen'));
   snapTo(1);
 });
 
