@@ -339,25 +339,28 @@
   .ways .way-studio { left: calc(50% - var(--d) / 2 + var(--door-in)); }
   .ways .way-works { left: calc(50% + var(--d) / 2 - var(--door-in)); }
   /* thehum.ing: the hum on its own, as its own small sign (thehum.ing's icon, the ring without its square)
-     in the bottom-right corner, level with the end mark and inside the safe area. Low until hovered or
-     focused, when it brightens and its name shows beside it. It comes and goes with the other doors. */
+     tucked into the bottom-right corner, 12px in from both edges past the safe area. The ring sits in the
+     corner of its 44px target, so the target still reaches inward. Low until hovered or focused, when it
+     brightens and its name shows beside it. It comes and goes with the other doors. */
   .ways .way-ing {
     top: auto; left: auto; transform: none; padding: 0; gap: 0;
-    right: max(12px, calc(env(safe-area-inset-right, 0px) + 6px));
-    bottom: calc(var(--footer-gap) + env(safe-area-inset-bottom, 0px));
+    right: calc(env(safe-area-inset-right, 0px) + 12px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
     width: 44px; height: 44px; opacity: 0.5;
+    display: flex; justify-content: flex-end; align-items: flex-end;
   }
   .way-ing svg { width: 18px; height: 18px; display: block; transition: filter 300ms ease; }
   .way-ing .ing-tip {
-    position: absolute; right: 100%; top: 50%; transform: translateY(-50%);
+    position: absolute; right: 26px; bottom: 0; line-height: 18px;
     font-size: 13px; white-space: nowrap; opacity: 0; pointer-events: none;
     transition: opacity 300ms ease;
   }
   .ways .way-ing:hover, .ways .way-ing:focus-visible { opacity: 0.9; }
   .ways .way-ing:is(:hover, :focus-visible) svg { filter: drop-shadow(0 0 4px rgba(180,140,255,0.5)); }
-  .ways .way-ing:is(:hover, :focus-visible) .ing-tip { opacity: 0.85; transform: translateY(-50%); }
+  .ways .way-ing:is(:hover, :focus-visible) .ing-tip { opacity: 0.85; }
   .ways .way-ing:focus-visible .ing-tip { outline: none; }
-  .ways .way-ing:focus-visible { outline: 1px solid rgba(180,140,255,0.6); outline-offset: -6px; border-radius: 50%; }
+  .ways .way-ing:focus-visible { outline: none; }
+  .ways .way-ing:focus-visible svg { outline: 1px solid rgba(180,140,255,0.6); outline-offset: 4px; border-radius: 50%; }   /* the ring sits in the target's corner, so the outline follows the ring */
   @media (min-width: 701px) and (max-height: 500px) {   /* the void too small to hold them: just outside the rim */
     .ways { --door-in: -64px; }
   }
