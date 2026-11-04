@@ -1,14 +1,16 @@
 // The way in: the door, the verse a line at a time (its clock and cues), the mark it settles on, the skip
 // and its guards (#10), the field taps' input, and the reset. And the way out: the dive.
 import {
-  reduced, voidEl, cx, cy, r, SHUT, bezier, swing, aperture, CLOSE_MS, DRAWIN_LEAD, expoInOut,
+  reduced, voidEl, cx, cy, r, maxR, SHUT, bezier, swing, aperture, CLOSE_MS, DRAWIN_LEAD, expoInOut,
   addTap, clock, cue, snapTo, clearCues, flare, lift,
 } from './field.js';
+import { btn, on, graph, tearDown, destroy, tapTone, setAimTuneIn, diveFade, diveFall } from './hum.js';
 
 // ---- The way in ------------------------------------------------------------
-// The door enters; the entrance is remembered. The end mark at the foot runs it backwards, to the door.
+// The door enters with the hum on, through the mark's own switch; "silently" enters with it off. Either
+// way the entrance is remembered. The end mark at the foot runs it backwards, to the door.
 const root = document.documentElement, door = document.querySelector('.door'), reset = document.querySelector('.verse-reset');
-const mark = document.querySelector('.mark');
+const mark = btn;   // the mark is the hum's switch
 const lines = [...document.querySelectorAll('.verse p > span')];
 const breaks = new Set([...document.querySelectorAll('.verse p + p > span:first-child')].map((l) => lines.indexOf(l)));
 // The verse at reading pace, one line on screen at once, at the void's centre. A line comes in (IN s, the
@@ -31,7 +33,7 @@ const HOLD = [
   1.9,   // through us.                       held: the arrival
 ];
 // When each line comes in and starts to go (s after the tap), and when the mark comes in: MARK_PAUSE s
-// after the last line has gone. landing(): the mark in and the void full (the hum aimed at it, when it had one).
+// after the last line has gone. landing(): the mark in and the void full; the hum's opening glide aims at it.
 const MARK_PAUSE = 0.6;
 const plan = (() => {
   let t = FIRST;
@@ -107,7 +109,7 @@ function skip() {
   cue(() => { markLater(MARK_AFTER); root.classList.remove('pacing', 'skipped'); }, 400 + MARK_IN * 1000);
   return true;
 }
-// The tap that skips is spent on it: it doesn't also follow a link. Same for
+// The tap that skips is spent on it: it doesn't also flip the hum or follow a link. Same for
 // Enter or Space on a focused control. The reset is left alone; it takes the verse down itself.
 addEventListener('pointerdown', (e) => {
   if (reset.contains(e.target) || !skip()) return;
@@ -131,12 +133,14 @@ addEventListener('wheel', (e) => {
   if (!wheelEarly && (e.deltaX || e.deltaY)) skip();
 }, { passive: true });
 // A tap in the field, once entered (during the entrance a tap skips; at the door nothing new): a point
-// where it landed. Taps on the mark, links, the end mark or any button behave as before. Outside the ring only.
+// where it landed, and, with the hum on, its tone. Taps on the mark, links, the end mark or any button
+// behave as before. Outside the ring only.
 addEventListener('pointerdown', (e) => {
   if (root.matches('.entering, .opening, .pacing, .leaving, .diving')) return;
   if (e.target.closest && e.target.closest('button, a, .door, .ways')) return;
-  if (Math.hypot(e.clientX - cx, e.clientY - cy) - r <= 12) return;
-  addTap(e.clientX, e.clientY, null);
+  const d = Math.hypot(e.clientX - cx, e.clientY - cy) - r;
+  if (d <= 12) return;
+  addTap(e.clientX, e.clientY, tapTone(e.clientX, d / Math.max(1, maxR - r)));
 }, { passive: true });
 // The pointer goes quiet after the tap that enters (not on touch: there's nothing to hide), and comes
 // back on its first real move, or if the page loses focus or is hidden. Only listened for while hidden.
@@ -154,11 +158,13 @@ function hideCursor() {
   addEventListener('pointermove', moved, { passive: true }); addEventListener('blur', showCursor);
   document.addEventListener('visibilitychange', showCursor);
 }
-function enter() {
+function enter(listen) {
   if (!root.classList.contains('entering')) return;
   hideCursor();
   try { localStorage.setItem('hum.entered', '1'); } catch (e) {}
   const focused = door.contains(document.activeElement);
+  if (graph && !on) { clearTimeout(tearDown); destroy(); }   // a reset's fade still running: listen builds fresh and tunes in
+  if (listen) { setAimTuneIn(true); btn.click(); }
   if (reduced) read(); else pace();
   root.classList.add('opening'); root.classList.remove('entering', 'arriving');
   if (reduced) {
@@ -175,6 +181,7 @@ function leave() {
   if (root.matches('.entering, .opening, .leaving')) return;
   try { localStorage.removeItem('hum.entered'); localStorage.removeItem('hum.heard'); } catch (e) {}
   const focused = document.activeElement === reset;
+  if (on) btn.click();   // the mark's own switch: the hum fades over 2 s
   clearTimeout(markTimer); root.classList.remove('mark-in');   // the end mark goes first (CSS: .leaving)
   halt(); refocus = false;
   show(-1);   // a line still up goes with the mark
@@ -183,7 +190,7 @@ function leave() {
   // The mark starts falling in; DRAWIN_LEAD later the void closes after it, and the door comes back as it lands.
   let back = false;
   const door_ = () => { if (back) return; back = true;
-    if (reduced) { snapTo(SHUT); root.classList.remove('dark'); }
+    if (reduced) { snapTo(SHUT); root.classList.remove('dark'); }   // the hum's 2 s fade may outlast this; enter() clears it
     unpace(); root.classList.remove('quiet-mark');   // the door, for the next entrance
     root.classList.add('entering', 'arriving'); root.classList.remove('leaving');
     if (focused) door.querySelector('.door-in').focus({ preventScroll: true });
@@ -195,32 +202,34 @@ function leave() {
     cue(door_, DRAWIN_LEAD * 1000 + CLOSE_MS);   // as the void lands
   }
 }
-door.querySelector('.door-in').addEventListener('click', enter);
+door.querySelector('.door-in').addEventListener('click', () => enter(true));
+door.querySelector('.door-quiet').addEventListener('click', () => enter(false));
 reset.addEventListener('click', leave);
 
 // ---- The way out ----------------------------------------------------------
 // Leaving through a door dives into the void: together, over DIVE_MS and gathering speed, the void opens
 // past the screen (to DIVE_REACH times the half-diagonal, so its dark fills the corners; the ring, glow and
-// infall follow), the doors fly outward and the end mark fades; the mark fades, or, taken, swells as it goes.
-// Then the next page, once. A new-tab click goes straight through.
+// infall follow), the doors fly outward, the mark and the end mark fade, and the hum falls away. Then the
+// next page, once. A new-tab click goes straight through.
 // Reduced motion: a quick fade to dark (DIVE_DARK ms), then the next page. Back (from the cache): as before.
 const DIVE_MS = 1100, DIVE_REACH = 1.15, DIVE_DARK = 350, DIVE_EASE = bezier(0.7, 0, 0.84, 0);   // easeInExpo: a slow lean, then the fall
 // Then a hang in the void before the next page (DIVE_HANG ms; DIVE_HANG_REDUCED under reduced motion), the
-// field still turning.
+// field still turning, while the hum's fall reaches its depths and fades.
 const DIVE_HANG = 1100, DIVE_HANG_REDUCED = 250;
 let diving = false;
 function go(href) {
   if (location.hash === '#humdebug' && window.__holdNav) { window.__navs = (window.__navs || 0) + 1; window.__navTo = href; window.__navAt = performance.now(); return; }
   location.href = href;
 }
-document.querySelectorAll('.ways a, .mark').forEach((a) => a.addEventListener('click', (e) => {   // the mark leaves the same way
+document.querySelectorAll('.ways a').forEach((a) => a.addEventListener('click', (e) => {
   if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   e.preventDefault();
   if (diving) return;
   diving = true;
   const secs = reduced ? DIVE_DARK : DIVE_MS, hang = reduced ? DIVE_HANG_REDUCED : DIVE_HANG;
   a.classList.add('chosen');   // at once: the door brightens, its caret jumps out, the other door goes (CSS)
-  flare(); lift(null);
+  flare(); lift(null); diveFall(secs / 1000, hang / 1000);
+  diveFade(secs / 1000, hang / 1000);
   root.classList.add('diving');
   if (reduced) root.classList.add('dark');
   else swing((Math.hypot(innerWidth, innerHeight) / 2 * DIVE_REACH) / (voidEl.offsetWidth / 2), clock, DIVE_MS, DIVE_EASE);
@@ -230,7 +239,7 @@ addEventListener('pageshow', (e) => {   // back from the next page: as it was be
   if (!e.persisted || !diving) return;
   diving = false;
   root.classList.remove('diving', 'dark');
-  document.querySelectorAll('.ways a.chosen, .mark.chosen').forEach((x) => x.classList.remove('chosen'));
+  document.querySelectorAll('.ways a.chosen').forEach((x) => x.classList.remove('chosen'));
   snapTo(1);
 });
 

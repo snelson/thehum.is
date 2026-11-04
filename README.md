@@ -27,13 +27,20 @@ readers, hidden to the eye only; without JavaScript it shows as a still
 block. Reduced motion: no sequence; the verse comes in whole and still, then
 crossfades to the mark after its reading time, or on a tap or a key.
 
-Listening is thehum.ing's: the mark is the way there, and leaving through it
-dives into the void as the doors do. The page itself makes no sound.
+The mark is also the switch for the sound: tap it to toggle (off by default;
+"tap to hear" under it while it's off), and the door's tap enters with it on
+("or silently", off). On, the mark hums: brighter, its glow swelling every
+2 s. The sound (`public/js/hum.js`) is a generative drone on the year tone,
+Earth's orbit raised 32 octaves (136.10 Hz; root an octave down at 68.05 Hz,
+C♯), in just ratios: a synth floor, upper harmony and a humming choir. The
+chord walks slowly between neighbours on the same root on uneven timing, now
+and then one tone blooms into vibrato, and a string section swells in every
+minute or two. It follows the ring: it leans toward the bright side and
+swells with hot spots, and while it plays the void, ring and sound breathe
+together on the year tone slowed 10 more octaves (one swell every ~7.5 s). A
+tap in the field adds a point and, with the hum on, a tone that falls in
+with it. Leaving through a door, the hum falls away with the dive. Debug hook
+only with #humdebug.
 
-The drone (`public/js/hum.js`) stays in the repo but is not loaded: nothing
-on the page reaches it. It was a generative drone on the year tone, Earth's
-orbit raised 32 octaves (136.10 Hz; root an octave down at 68.05 Hz, C♯),
-in just ratios, whose chord walked slowly between neighbours on the same
-root, breathed with the void and followed the ring. To bring it back, import
-it in `public/js/main.js` and give it a switch (id `hum`) and a hint (id
-`hum-hint`).
+thehum.ing, the hum playing on its own, is a third door, quieter, at the
+bottom of the rim.
