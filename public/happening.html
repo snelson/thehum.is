@@ -13,7 +13,7 @@
 <meta property="og:description" content="Everything is this. Still enough to hear that it becomes through us.">
 <meta property="og:url" content="https://thehum.is/happening">
 <title>The Hum</title>
-<script>try { if (!localStorage.getItem('hum.entered') && !localStorage.getItem('hum.heard')) document.documentElement.classList.add('entering'); } catch (e) {}</script>
+<script>document.documentElement.classList.add('js'); try { if (!localStorage.getItem('hum.entered') && !localStorage.getItem('hum.heard')) document.documentElement.classList.add('entering'); } catch (e) {}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..400;1,6..72,300&display=swap" rel="stylesheet">
@@ -28,11 +28,13 @@
     --ring: #b48cff;
     --magenta: #ff5fb8;
     --teal: #4fd6c8;
-    /* Void diameter. Desktop: fixed. Phone: wider than the screen, so the
-       ring reads as a horizon, not a badge. Cap keeps the verse inside. */
-    --d: 560px;
+    /* Void diameter. Wide screens: up to 560px, and never so tall that the ring meets the end mark at the
+       foot (--clear: the room kept above and below it). Tall tablets: larger, up to 720px. Phones: wider
+       than the screen, so the ring reads as a horizon, not a badge, still clear of the foot. */
+    --clear: calc(88px + env(safe-area-inset-bottom, 0px));
+    --d: clamp(280px, min(70vw, 100svh - 2 * var(--clear)), 560px);
     --inscription-size: 11px;
-    --verse-size: 22px;
+    --verse-size: 20px;
     --verse-lh: 1.6;
     --verse-w: min(80vw, 420px);
     --footer-h: 44px;   /* a door's tap height */
@@ -45,15 +47,28 @@
     --draw-in-time: 1.1s;
     --dive-time: 1.1s;   /* leaving through a door: the script's DIVE_MS */
     --dive-ease: cubic-bezier(0.7, 0, 0.84, 0);   /* the script's DIVE_EASE (easeInExpo) */
-    /* The name's return: how far it rises into place and over how long (the fade lands a little sooner). */
-    --head-rise: 28px;
-    --head-rise-time: 1.8s;
+    /* The verse, a line at a time: a line comes in over --line-in (rising out of the void a little,
+       decelerating) and goes over --line-out (drawn back in, on the draw-in's ease). The script reads both. */
+    --line-in: 0.7s;
+    --line-out: 0.55s;
+    /* The name, THE HUM, at the void's centre once the verse is done. It comes in over --mark-in. */
+    --mark-in: 1.8s;
+  }
+  @media (min-width: 701px) and (orientation: portrait) {
+    :root { --d: clamp(280px, min(80vw, 100svh - 2 * var(--clear)), 720px); }
+  }
+  /* Short and wide (a phone on its side): the end mark sits lower, so the void can keep more of the height. */
+  @media (min-width: 701px) and (max-height: 500px) {
+    :root {
+      --footer-gap: 6px; --clear: calc(56px + env(safe-area-inset-bottom, 0px)); --verse-size: 17px;
+      --d: clamp(160px, 100svh - 2 * var(--clear), 560px);
+    }
   }
   @media (max-width: 700px) {
     :root {
-      --d: clamp(560px, 150vw, 720px);
+      --d: max(280px, min(150vw, 720px, 100svh - 2 * var(--clear)));
       --inscription-size: 10px;
-      --verse-size: 18px;
+      --verse-size: 17px;
       --verse-lh: 1.55;
       --verse-w: 80vw;
     }
@@ -98,67 +113,13 @@
     /* Depth without motion: just off the field at the rim, near-black at the center. A hole that recedes. */
     background: radial-gradient(circle closest-side, #040309 0%, #06050d 45%, #0a0915 82%, #0d0b18 100%);
   }
-  /* The name frames the page from the top edge, as the link does from the bottom. */
-  .head {
-    position: absolute; left: 0; right: 0; top: 0; z-index: 2; margin: 0; /* above the verse flow, so the switch takes the tap */
-    padding-top: calc(var(--footer-gap) + 14px + env(safe-area-inset-top, 0px));
-    display: flex; flex-direction: column; align-items: center;
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    font-weight: 500; font-size: var(--inscription-size);
-    letter-spacing: 0.38em; text-transform: uppercase;
-    color: var(--ink-dim);
-  }
-  /* The name is also the switch. Same look as before; the tap target grows
-     downward into the dark so the text doesn't move. */
-  .hum-toggle {
-    appearance: none; -webkit-appearance: none;
-    background: none; border: 0; margin: 0; box-sizing: border-box;
-    font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit;
-    opacity: 0.75;
-    display: inline-flex; align-items: flex-start;
-    min-width: 44px; min-height: 44px; line-height: 13px;
-    /* left pad balances the trailing tracking, so THE HUM stays centered */
-    padding: 0 0 31px 0.38em;
-    cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
-    transition: opacity 300ms ease;
-  }
-  .hum-toggle:hover { opacity: 0.95; }
-  .hum-toggle:focus { outline: none; }
-  .hum-toggle:focus-visible .hum-text {
-    outline: 1px solid rgba(180,140,255,0.6); outline-offset: 5px; border-radius: 2px;
-  }
-  /* On: the words themselves hum — brighter, with a soft glow that swells and settles every 2 s. */
-  .hum-text { transition: color 2s ease, text-shadow 2s ease; }
-  .hum-toggle[aria-pressed="true"] { opacity: 0.95; }
-  .hum-toggle[aria-pressed="true"] .hum-text {
-    color: #cfc6ee;
-    animation: hum-pulse 2s ease-in-out 1.5s infinite;
-  }
-  @keyframes hum-pulse {
-    0%, 100% { color: #b9b0da; text-shadow: 0 0 4px rgba(180,140,255,0.15); }
-    50% { color: #ece6ff; text-shadow: 0 0 9px rgba(180,140,255,0.55); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .hum-toggle[aria-pressed="true"] .hum-text { animation: none; }
-  }
-  .hum-hint {
-    margin-top: -22px;
-    font-family: "Newsreader", Georgia, serif; font-style: italic; font-weight: 300;
-    font-size: 11px; letter-spacing: 0.02em; text-transform: none;
-    color: var(--ink-dim); opacity: 0.45;
-    pointer-events: none;
-    transition: opacity 1.6s ease;
-  }
-  .hum-hint.fade { opacity: 0; }
-
   /* First visit: the void starts closed, a third of its size, with the name in it.
      Tapping it is the way in. Without JS, or once entered, none of this shows.
      The reset under the links plays it backwards, back to this door. */
   .door { display: none; }
   .entering .door, .opening .door { display: block; position: fixed; inset: 0; z-index: 3; pointer-events: none; }
   .entering .void { transform: translate(-50%, -50%) scale(0.3333); }
-  .entering .head { opacity: 0; visibility: hidden; }
-  .entering .verse p > span { opacity: 0; }   /* hidden to the eye only; still read */
+  .entering .name, .opening .name { opacity: 0; visibility: hidden; }
   .door-in {
     appearance: none; -webkit-appearance: none;
     background: none; border: 0; margin: 0; padding: 0;
@@ -173,12 +134,12 @@
     cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
   }
   .door-name { display: flex; flex-direction: column; align-items: center; opacity: 0.75; transition: opacity 300ms ease; }
-  .door-word { padding-left: 0.38em; }   /* balances the trailing tracking, as in the header */
+  .door-word { padding-left: 0.38em; }   /* balances the trailing tracking */
   .door-hint {
     margin-top: 9px;
     font-family: "Newsreader", Georgia, serif; font-style: italic; font-weight: 300;
     font-size: 11px; letter-spacing: 0.02em; text-transform: none;
-    opacity: 0.6;   /* inside the name's 0.75: the header hint's 0.45 */
+    opacity: 0.6;   /* inside the name's 0.75 */
   }
   .door-in:hover .door-name { opacity: 0.95; }
   .door-in:focus, .door-quiet:focus { outline: none; }
@@ -201,8 +162,9 @@
   .door-quiet:hover { opacity: 0.5; }
   .arriving .door-in, .arriving .door-ways { animation: appear 1.2s ease both; }
   @keyframes appear { from { opacity: 0; } }
-  /* The tap: the void opens (drawn by the canvas, 2.4 s) and the name is pulled in as it goes,
-     gone by the middle; the name lands at the top as the void settles, then the verse a line at a time. */
+  /* The tap: the void opens (drawn by the canvas) and the name is pulled in as it goes, gone by the middle.
+     Then the verse a line at a time at the void's centre (.on, one line at once), and after the last, the
+     name, THE HUM, comes in where the lines were (.marked) and stays. A skip lets the line go and brings the name. */
   @media (prefers-reduced-motion: no-preference) {
     .opening .door-in .door-name {   /* outranks :hover, which the tapping pointer is still on */
       opacity: 0; transform: scale(0.2);
@@ -210,55 +172,51 @@
     }
     .opening .door-word { letter-spacing: 0; padding-left: 0; transition: all 1.2s cubic-bezier(0.55, 0, 1, 0.45); }
     .opening .door-ways { opacity: 0; transition: opacity 0.6s ease; }
-    .opening .head { transition: opacity 0.9s ease 1.9s, visibility 0s linear 1.9s; }
-    /* The verse at reading pace, laid out at its final size from the start. From its PACE time each
-       line's letters stream in one by one (.ch.on, each fading 0.4 s), and the letters (.ink) slide by
-       half of what's still to come, so the line widens from the middle. "Nothing." arrives at the centre
-       and holds; then the whole verse slowly follows what's visible (the script's follow), landing in
-       place as the void reaches full. A pause, then the name comes back at the top (.landed),
-       then the end mark. A skip shows the rest, the void and the name together. */
-    .pacing .verse .ink { display: inline-block; transition: transform 0.04s ease-out; }
-    .pacing .verse .ch { opacity: 0; transition: opacity 0.4s ease; }
-    .pacing .verse .ch.on { opacity: 1; }
-    .pacing.skipped .verse .ink { transition: transform 0.6s ease-in-out; }
-    /* The name surfaces: it rises --head-rise into place over --head-rise-time, decelerating, solid before it
-       settles; it sinks back the same distance on the reset. */
-    .pacing .head {
-      opacity: 0; visibility: hidden; transform: translateY(var(--head-rise));
+    .js .verse p > span {
+      transform: translateY(-50%) scale(0.97);
+      transition: opacity var(--line-out) var(--draw-in-ease), transform var(--line-out) var(--draw-in-ease);
+    }
+    .js .verse p > span.on {
+      transform: translateY(-50%);
+      transition: opacity var(--line-in) ease, transform var(--line-in) cubic-bezier(0.33, 1, 0.68, 1);
+    }
+    .skipped .verse p > span { transition-duration: 0.4s; }
+    .pacing .name {
+      opacity: 0; visibility: hidden; transform: scale(0.85);
       transition: opacity 0.6s ease, transform 0.6s ease, visibility 0s linear 0.6s;
     }
-    .pacing.landed .head {
+    .pacing.marked .name {
       opacity: 1; visibility: visible; transform: none;
-      transition: opacity calc(var(--head-rise-time) * 0.75) ease, transform var(--head-rise-time) cubic-bezier(0.33, 1, 0.68, 1), visibility 0s;
+      transition: opacity calc(var(--mark-in) * 0.75) ease, transform var(--mark-in) cubic-bezier(0.33, 1, 0.68, 1), visibility 0s;
     }
-    .pacing.skipped.landed .head { transition: opacity 0.6s ease, transform 0.8s cubic-bezier(0.33, 1, 0.68, 1), visibility 0s; }
-    /* Backwards: the end mark goes, the name sinks, and the verse is drawn into the void's centre the way
-       the name is on the way in (--draw-in-ease, --draw-in-time), as the void closes around it. */
-    .leaving .verse-wrap {
-      opacity: 0; transform: scale(0.2); transform-origin: 50% 50vh;
-      transition: transform var(--draw-in-time) var(--draw-in-ease), opacity var(--draw-in-time) var(--draw-in-fade);   /* at once; the void follows DRAWIN_LEAD later */
-    }
-    .leaving .head, .leaving.pacing.landed .head {
-      opacity: 0; visibility: hidden; transform: translateY(var(--head-rise));
-      transition: opacity 0.6s ease 0.2s, transform 0.8s cubic-bezier(0.7, 0, 0.84, 0) 0.2s, visibility 0s linear 1s;
+    /* Backwards: the end mark goes, and the name is drawn into the void's centre the way the name is on the
+       way in (--draw-in-ease, --draw-in-time), as the void closes around it. */
+    .leaving .name {
+      opacity: 0; visibility: hidden; transform: scale(0.2);
+      transition: transform var(--draw-in-time) var(--draw-in-ease), opacity var(--draw-in-time) var(--draw-in-fade), visibility 0s linear var(--draw-in-time);
     }
   }
-  /* Reduced motion: no pull, no opening. The door fades out, the page fades in. */
+  /* Reduced motion: no pull, no opening, no sequence. The door fades out; the verse comes in whole and
+     still (.reading), stays for as long as the lines would have taken (or until a tap or a key), then
+     gives way to the name in one crossfade (.read-out). */
   @media (prefers-reduced-motion: reduce) {
     .opening .door { opacity: 0; transition: opacity 0.6s ease; }
     .opening .stage { transition: opacity 0.6s ease; }
     .opening.dark .stage { opacity: 0; }
-    .opening .head { transition: opacity 0.8s ease 0.3s, visibility 0s linear 0.3s; }
-    .opening .verse p > span { transition: opacity 0.8s ease 0.3s; }
-    .leaving .head { opacity: 0; visibility: hidden; transition: opacity 0.6s ease, visibility 0s linear 0.6s; }
-    .leaving .verse p > span { opacity: 0; transition: opacity 0.6s ease; }
+    .js .verse p > span { transition: none; }
+    .reading .verse { animation: appear 0.8s ease 0.3s both; }
+    .reading .name { opacity: 0; visibility: hidden; }
+    .read-out .verse { opacity: 0; transition: opacity 0.8s ease; }
+    .name { transition: opacity 0.8s ease; }
+    .leaving .name { opacity: 0; visibility: hidden; transition: opacity 0.6s ease, visibility 0s linear 0.6s; }
+    .leaving .verse { opacity: 0; transition: opacity 0.6s ease; }
     .leaving .stage, .arriving .stage { transition: opacity 0.6s ease; }
     .leaving.dark .stage { opacity: 0; }
   }
 
-  /* Verse sits in flow so a short viewport scrolls instead of clipping.
-     Symmetric padding keeps it on the viewport center when it fits, and
-     clear of the name at the top. */
+  /* Without the script the verse is a still block in the middle of the void. With it, the verse's lines
+     sit stacked at the void's centre, each hidden to the eye only (still read), and are shown one at a time
+     by the entrance. */
   .verse-wrap {
     position: relative;
     z-index: 1;
@@ -276,7 +234,7 @@
     font-weight: 340;   /* light text on the dark reads thinner than it is */
     font-size: var(--verse-size);
     line-height: var(--verse-lh);
-    color: rgb(216 208 244 / 0.95);   /* the hum's own lavender, a step brighter (the playing name's #cfc6ee), so the words share its light */
+    color: rgb(216 208 244 / 0.95);   /* the hum's own lavender, a step brighter, so the words share its light */
   }
   .verse p { margin: 0; }
   .verse p + p { margin-top: calc(var(--verse-size) * var(--verse-lh) * 1.25); }   /* a breath, not a skipped line */
@@ -284,10 +242,61 @@
     display: block;
     text-wrap: balance;
   }
-  .verse .sr {   /* a streaming line's whole text, for screen readers; the letters are aria-hidden */
-    position: absolute; width: 1px; height: 1px; overflow: hidden;
-    clip-path: inset(50%); white-space: nowrap;
+  .js .verse-wrap { position: fixed; inset: 0; min-height: 0; padding: 0; display: block; pointer-events: none; }
+  .js .verse { position: absolute; left: 50%; top: 50%; height: 0; margin-left: calc(var(--verse-w) / -2); }
+  .js .verse p + p { margin: 0; }
+  .js .verse p > span { position: absolute; left: 0; right: 0; top: 0; transform: translateY(-50%); opacity: 0; }   /* hidden to the eye only; still read */
+  .js .verse p > span.on { opacity: 1; }
+  .js.reading .verse-wrap { display: grid; place-items: center; }
+  .js.reading .verse { position: static; height: auto; margin: 0; }
+  .js.reading .verse p + p { margin-top: calc(var(--verse-size) * var(--verse-lh) * 1.25); }
+  .js.reading .verse p > span { position: static; transform: none; opacity: 1; }
+
+  /* The name: THE HUM at the void's exact centre, where the lines were, in the door's type. It is the switch
+     for the hum. Under it, while the hum is off, "tap to hear". On, the words themselves hum: brighter, with
+     a soft glow that swells and settles every 2 s. The tap target grows around the words, not the words. */
+  .name {
+    position: fixed; inset: 0; z-index: 2; margin: 0;
+    display: grid; place-items: center;
+    pointer-events: none;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-weight: 500; font-size: var(--inscription-size);
+    letter-spacing: 0.38em; text-transform: uppercase;
+    color: var(--ink-dim);
   }
+  html:not(.js) .name { display: none; }
+  .mark {
+    appearance: none; -webkit-appearance: none; background: none; border: 0; margin: 0; box-sizing: border-box;
+    font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit;
+    pointer-events: auto; opacity: 0.75;
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 44px; min-height: 44px; line-height: 13px;
+    padding: 0 14px 0 calc(14px + 0.38em);   /* the left pad balances the trailing tracking, so THE HUM stays centred */
+    cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    transition: opacity 300ms ease;
+  }
+  .mark:hover { opacity: 0.95; }
+  .mark:focus { outline: none; }
+  .mark:focus-visible .hum-text { outline: 1px solid rgba(180,140,255,0.6); outline-offset: 5px; border-radius: 2px; }
+  .hum-text { transition: color 2s ease, text-shadow 2s ease; }
+  .mark[aria-pressed="true"] { opacity: 0.95; }
+  .mark[aria-pressed="true"] .hum-text { color: #cfc6ee; animation: hum-pulse 2s ease-in-out 1.5s infinite; }
+  @keyframes hum-pulse {
+    0%, 100% { color: #b9b0da; text-shadow: 0 0 4px rgba(180,140,255,0.15); }
+    50% { color: #ece6ff; text-shadow: 0 0 9px rgba(180,140,255,0.55); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mark[aria-pressed="true"] .hum-text { animation: none; }
+  }
+  .hum-hint {
+    position: absolute; left: 0; right: 0; top: calc(50% + 12px); text-align: center;
+    font-family: "Newsreader", Georgia, serif; font-style: italic; font-weight: 300;
+    font-size: 11px; letter-spacing: 0.02em; text-transform: none;
+    opacity: 0.45; pointer-events: none;
+    transition: opacity 1.6s ease;
+  }
+  .hum-hint.fade { opacity: 0; }
+  .name .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
   /* The ways onward: studio and works as doors on the horizon, left and right of the verse. Wide: on the
      ring's centre line, just inside its rim (--door-in). Phones, where the rim's sides are off-screen:
@@ -329,6 +338,32 @@
   }
   .ways .way-studio { left: calc(50% - var(--d) / 2 + var(--door-in)); }
   .ways .way-works { left: calc(50% + var(--d) / 2 - var(--door-in)); }
+  /* thehum.ing: the hum on its own, as its own small sign (thehum.ing's icon, the ring without its square)
+     tucked into the bottom-right corner, 12px in from both edges past the safe area. The ring sits in the
+     corner of its 44px target, so the target still reaches inward. Low until hovered or focused, when it
+     brightens and its name shows beside it. It comes and goes with the other doors. */
+  .ways .way-ing {
+    top: auto; left: auto; transform: none; padding: 0; gap: 0;
+    right: calc(env(safe-area-inset-right, 0px) + 12px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+    width: 44px; height: 44px; opacity: 0.5;
+    display: flex; justify-content: flex-end; align-items: flex-end;
+  }
+  .way-ing svg { width: 18px; height: 18px; display: block; transition: filter 300ms ease; }
+  .way-ing .ing-tip {
+    position: absolute; right: 26px; bottom: 0; line-height: 18px;
+    font-size: 13px; white-space: nowrap; opacity: 0; pointer-events: none;
+    transition: opacity 300ms ease;
+  }
+  .ways .way-ing:hover, .ways .way-ing:focus-visible { opacity: 0.9; }
+  .ways .way-ing:is(:hover, :focus-visible) svg { filter: drop-shadow(0 0 4px rgba(180,140,255,0.5)); }
+  .ways .way-ing:is(:hover, :focus-visible) .ing-tip { opacity: 0.85; }
+  .ways .way-ing:focus-visible .ing-tip { outline: none; }
+  .ways .way-ing:focus-visible { outline: none; }
+  .ways .way-ing:focus-visible svg { outline: 1px solid rgba(180,140,255,0.6); outline-offset: 4px; border-radius: 50%; }   /* the ring sits in the target's corner, so the outline follows the ring */
+  @media (min-width: 701px) and (max-height: 500px) {   /* the void too small to hold them: just outside the rim */
+    .ways { --door-in: -64px; }
+  }
   @media (max-width: 700px) {
     .ways .way-studio { left: calc(env(safe-area-inset-left, 0px) + 20px); transform: translateY(-50%); }
     .ways .way-works { left: auto; right: calc(env(safe-area-inset-right, 0px) + 20px); transform: translateY(-50%); }
@@ -338,52 +373,35 @@
     opacity: 1;
     outline: none;
   }
-  /* The foot: thehum.ing, the hum with nothing else. It frames the page from the bottom edge as the name
-     does from the top, in the name's type; not a door. It comes and goes with the doors. */
+  .ways a:focus-visible span { outline: 1px solid rgba(180,140,255,0.6); outline-offset: 5px; border-radius: 2px; }
+  /* The foot: the end mark, a small turning arrow, easy to miss. It brings the entrance back. It frames the
+     page from the bottom edge, outside the ring. */
   .foot {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 2;
     padding-bottom: calc(var(--footer-gap) + env(safe-area-inset-bottom, 0px));
     display: flex; justify-content: center;
     pointer-events: none;
   }
-  .foot a {
-    pointer-events: auto;
-    display: inline-flex; align-items: center;
-    min-height: var(--footer-h); padding: 0 12px 0 calc(12px + 0.38em);   /* balances the trailing tracking */
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    font-weight: 500; font-size: calc(var(--inscription-size) - 2px);
-    letter-spacing: 0.38em; text-transform: uppercase;
-    color: var(--ink-dim); opacity: 0.55;   /* a step quieter than the name; the type and the hover are its own */
-    text-decoration: none;
-    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
-    transition: opacity 300ms ease;
-  }
-  /* The name's hover: only brighter, no colour change. */
-  .foot a:hover, .foot a:focus-visible { opacity: 0.95; outline: none; }
-  .foot a:focus-visible span { outline: 1px solid rgba(180,140,255,0.6); outline-offset: 5px; border-radius: 2px; }
-  /* Reset: a small turning arrow under the verse, its end mark, easy to miss. Brings the entrance back.
-     It hangs below the verse without taking room, so the verse's centring is the verse's alone. */
-  .verse { position: relative; }
+  html:not(.js) .foot { display: none; }
   .verse-reset {
     appearance: none; -webkit-appearance: none; background: none; border: 0; margin: 0; padding: 0;
-    position: absolute; left: 50%; top: calc(100% + var(--verse-size) * var(--verse-lh) * 0.7 - 17px); transform: translateX(-50%);
+    pointer-events: auto;
     width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
     color: var(--ink-dim); opacity: 0.38; cursor: pointer;
     -webkit-tap-highlight-color: transparent; touch-action: manipulation;
     transition: color 300ms ease, opacity 300ms ease;
   }
-  .verse-reset:hover, .verse-reset:focus-visible { opacity: 0.75; outline: none; }
+  .verse-reset:hover, .verse-reset:focus-visible { opacity: 0.75; }
+  .verse-reset:focus { outline: none; }
+  .verse-reset:focus-visible svg { outline: 1px solid rgba(180,140,255,0.6); outline-offset: 6px; border-radius: 50%; }
   .verse-reset svg { display: block; width: 10px; height: 10px; }
-  /* Hidden at the door, while the entrance runs (.quiet-mark: until 1.5 s after the void is full), and
-     first to go on the reset. It arrives slowly (.mark-in), the last thing. */
+  /* Hidden at the door, while the entrance runs (.quiet-mark: until the name has come in), and first to go
+     on the reset. They arrive slowly (.mark-in), the last thing: the end mark and the doors. */
   .entering .verse-reset, .opening .verse-reset, .quiet-mark .verse-reset,
   .entering .ways a, .opening .ways a, .quiet-mark .ways a,
-  .entering .foot a, .opening .foot a, .quiet-mark .foot a { visibility: hidden; opacity: 0; }
-  .mark-in .foot a { transition: opacity 1.5s ease; }
-  .leaving .foot a, .diving .foot a:not(.chosen) { visibility: hidden; opacity: 0; transition: opacity 0.4s ease, visibility 0s linear 0.4s; }
-  /* Taken, it leaves as a door does: it brightens at once, holds, and fades through the dive. */
-  .diving .foot a.chosen { animation: foot-chosen var(--dive-time) linear both; }
-  @keyframes foot-chosen { 0% { opacity: 0.55; } 9% { opacity: 0.95; } 55% { opacity: 0.8; } 100% { opacity: 0; } }
+  .entering .hum-hint, .opening .hum-hint, .quiet-mark .hum-hint { visibility: hidden; opacity: 0; }
+  .mark-in .hum-hint { transition: opacity 1.5s ease; }
+  .leaving .hum-hint { visibility: hidden; opacity: 0; transition: opacity 0.25s ease, visibility 0s linear 0.25s; }
   .leaving .verse-reset { visibility: hidden; opacity: 0; transition: opacity 0.25s ease, visibility 0s linear 0.25s; }
   /* On the reset the doors fall in with the verse: drawn toward the centre, shrinking and fading, on its ease. */
   .ways { --inward: calc(var(--d) / 2 - var(--door-in)); }
@@ -407,7 +425,7 @@
     opacity: 0; transform: scale(0.2); transform-origin: 50% 50vh;
     transition: transform var(--dive-time) var(--dive-ease), opacity var(--dive-time) var(--draw-in-fade);
   }
-  .diving .head, .diving.pacing.landed .head, .diving .verse-reset { opacity: 0; transition: opacity calc(var(--dive-time) * 0.6) ease; }
+  .diving .mark, .diving .verse-reset { opacity: 0; transition: opacity calc(var(--dive-time) * 0.6) ease; }
   .ways { --outward: 45vw; }
   .diving .ways a {
     opacity: 0;
@@ -415,6 +433,7 @@
   }
   .diving .ways .way-studio { transform: translate(calc(-50% - var(--outward)), -50%) scale(1.6); }
   .diving .ways .way-works { transform: translate(calc(-50% + var(--outward)), -50%) scale(1.6); }
+  .diving .ways .way-ing { transform: scale(1.6); }
   /* The click answers at once, under the dive: the chosen door snaps bright (--chosen-snap) and holds a
      moment before it fades on the way out, its caret jumping out (--chosen-jump); the other door goes
      quickly (--other-fade). */
@@ -434,9 +453,8 @@
     .diving .ways .way-works { transform: translate(var(--outward), -50%) scale(1.6); }
   }
   @media (prefers-reduced-motion: reduce) {
-    .diving .verse-wrap, .diving .head, .diving .verse-reset, .diving .ways a { transform: none; transition: opacity 0.3s ease; }
+    .diving .verse-wrap, .diving .mark, .diving .verse-reset, .diving .ways a { transform: none; transition: opacity 0.3s ease; }
     .diving .ways a.chosen { animation: none; opacity: 1; transition: none; }   /* an instant brightening, no jump */
-    .diving .foot a.chosen { animation: none; opacity: 0.95; }
     .diving .ways .way-studio.chosen .way-arrow, .diving .ways .way-works.chosen .way-arrow { transform: none; transition: none; }
     @media (min-width: 701px) { .diving .ways .way-studio, .diving .ways .way-works { transform: translate(-50%, -50%); } }
     @media (max-width: 700px) { .diving .ways .way-studio, .diving .ways .way-works { transform: translateY(-50%); } }
@@ -446,6 +464,7 @@
   @media (prefers-reduced-motion: reduce) {
     .ways a, .mark-in .ways a, .leaving .ways a { transition: none; }
     .leaving .ways .way-studio, .leaving .ways .way-works { transform: none; }
+    .leaving .ways .way-ing, .diving .ways .way-ing { transform: none; }
     @media (min-width: 701px) { .leaving .ways .way-studio, .leaving .ways .way-works { transform: translate(-50%, -50%); } }
     @media (max-width: 700px) { .leaving .ways .way-studio, .leaving .ways .way-works { transform: translateY(-50%); } }
   }
@@ -467,11 +486,6 @@
   </div>
 </div>
 
-<h1 class="head">
-  <button type="button" class="hum-toggle" id="hum" aria-pressed="false" aria-label="Turn the hum on"><span class="hum-text">The Hum</span></button>
-  <span class="hum-hint" id="hum-hint" aria-hidden="true" hidden>tap to hear</span>
-</h1>
-
 <main class="verse-wrap">
   <div class="verse">
     <p>
@@ -489,17 +503,23 @@
       <span><span>that it becomes</span></span>
       <span><span>through us.</span></span>
     </p>
-    <button type="button" class="verse-reset" aria-label="See the entrance again"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9"/><path d="M12.2 1.6v2.8H9.4"/></svg></button>
   </div>
 </main>
 
 <nav class="ways" aria-label="Onward">
   <a class="way-studio" href="https://thehum.studio" aria-label="thehum.studio"><svg class="way-arrow" viewBox="0 0 6 10" aria-hidden="true"><path d="M5 1 1 5l4 4"/></svg><span>studio</span></a>
   <a class="way-works" href="https://thehum.works" aria-label="thehum.works"><span>works</span><svg class="way-arrow" viewBox="0 0 6 10" aria-hidden="true"><path d="M1 1l4 4-4 4"/></svg></a>
+  <a class="way-ing" href="https://thehum.ing" aria-label="thehum.ing"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="ing-ring" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b48cff"/><stop offset=".25" stop-color="#ca7eea"/><stop offset=".5" stop-color="#b48cff"/><stop offset=".8" stop-color="#96a2ef"/><stop offset="1" stop-color="#b48cff"/></linearGradient></defs><circle cx="32" cy="32" r="22" fill="#040309" stroke="url(#ing-ring)" stroke-width="5"/></svg><span class="ing-tip" aria-hidden="true">thehum.ing</span></a>
 </nav>
 
+<h1 class="name">
+  <span class="sr">The Hum</span>
+  <button type="button" class="mark" id="hum" aria-pressed="false" aria-label="Turn the hum on"><span class="hum-text">The Hum</span></button>
+  <span class="hum-hint" id="hum-hint" aria-hidden="true" hidden>tap to hear</span>
+</h1>
+
 <footer class="foot">
-  <a href="https://thehum.ing" aria-label="thehum.ing: just the hum"><span>Just the hum.ing</span></a>
+  <button type="button" class="verse-reset" aria-label="See the entrance again"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9"/><path d="M12.2 1.6v2.8H9.4"/></svg></button>
 </footer>
 
 <script type="module" src="js/main.js"></script>

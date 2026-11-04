@@ -261,7 +261,7 @@ const rgba0 = c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
 let last = 0, t0 = performance.now(), raf = 0;
 // The entrance's own clock (ms). It runs with the frames, so it stops while the page is hidden or frozen
 // and goes on from there when it's back; one frame never moves it more than CLOCK_STEP, so nothing that
-// fell due while the page was away arrives at once. The swings, the verse's drift and its cues read it.
+// fell due while the page was away arrives at once. The swings and the verse's cues read it.
 const CLOCK_STEP = 250;
 let clock = 1, cues = [];
 const cue = (fn, ms) => cues.push({ fn, at: clock + ms });
@@ -273,8 +273,6 @@ function runCues() {   // due ones, earliest first; a cue may add cues or clear 
     cues.splice(k, 1)[0].fn();
   }
 }
-const verseEl = document.querySelector('.verse');
-let flow = null, flowY = 0;   // the verse's vertical offset while the entrance runs (see the entrance); null: in place
 function frame(now) {
   const ms = now - last, dt = Math.max(0, Math.min(0.05, ms / 1000)); last = now;
   clock += Math.max(0, Math.min(CLOCK_STEP, ms));
@@ -291,7 +289,7 @@ function frame(now) {
   r = r0 * s;
   if (Math.abs(s - lastScale) > 0.0002) { voidEl.style.transform = `translate(-50%, -50%) scale(${s.toFixed(4)})`; lastScale = s; }
   // The door's lift eases toward its target: up over ~0.5 s, down over ~0.8 s (fast once the entrance starts).
-  const lt = liftOn && html.classList.contains('entering') ? 1 : 0;
+  const lt = liftTarget();
   const tau = lt > vis.lift ? 0.17 : html.classList.contains('entering') ? 0.27 : 0.08;
   vis.lift += (lt - vis.lift) * (1 - Math.exp(-dt / tau)); if (vis.lift < 0.001) vis.lift = 0;
   if (flareAt) {   // the flare: up over FLARE_RISE ms, then away over FLARE_DECAY ms
@@ -299,7 +297,6 @@ function frame(now) {
     vis.flare = ft < FLARE_RISE ? ft / FLARE_RISE : Math.exp(-(ft - FLARE_RISE) / FLARE_DECAY);
     if (vis.flare < 0.001) { vis.flare = 0; flareAt = 0; }
   }
-  if (flow) { flowY = flow.at(clock, dt); verseEl.style.transform = `translateY(${flowY.toFixed(2)}px)`; }
   step(dt);
   settleDent(dt);
   drawPoints();
@@ -319,19 +316,28 @@ const LIFT = 0.2, html = document.documentElement;
 const FLARE = 0.9, FLARE_RISE = 80, FLARE_DECAY = 500;
 let flareAt = 0;
 function flare() { if (!reduced) flareAt = performance.now(); }
-let liftOn = false;
+// The mark, once it has come in, lifts the ring the same way: it is the way to the hum itself.
+let liftOn = false, liftMark = false;
+const liftTarget = () => (liftOn && html.classList.contains('entering')) ||
+  (liftMark && !html.matches('.entering, .opening, .leaving, .diving, .reading, .pacing:not(.marked)')) ? 1 : 0;
 function lifted(on) {
   liftOn = on && html.classList.contains('entering');
-  if (reduced) { vis.lift = liftOn ? 1 : 0; drawStatic(); }
+  if (reduced) { vis.lift = liftTarget(); drawStatic(); }
 }
-{
-  const doorIn = document.querySelector('.door-in');
-  doorIn.addEventListener('pointerenter', () => lifted(true));
-  doorIn.addEventListener('pointerleave', () => lifted(false));
-  doorIn.addEventListener('focus', () => lifted(doorIn.matches(':focus-visible')));
-  doorIn.addEventListener('blur', () => lifted(false));
-  doorIn.addEventListener('click', () => lifted(false));
+function lift(on) {
+  liftMark = !!on;
+  if (reduced) { vis.lift = liftTarget(); drawStatic(); }
 }
+const hover = (el, set) => {
+  if (!el) return;
+  el.addEventListener('pointerenter', () => set(true));
+  el.addEventListener('pointerleave', () => set(false));
+  el.addEventListener('focus', () => set(el.matches(':focus-visible')));
+  el.addEventListener('blur', () => set(false));
+  el.addEventListener('click', () => set(false));
+};
+hover(document.querySelector('.door-in'), lifted);
+hover(document.querySelector('.mark'), lift);
 
 if (aperture < 1) { voidEl.style.transform = `translate(-50%, -50%) scale(${SHUT.toFixed(4)})`; lastScale = SHUT; }
 layout();
@@ -347,14 +353,13 @@ if (reduced) {
 // The sound, as the field needs it: the hum's per-frame tick and a tap tone's redshift and release.
 // Set by main.js (the field doesn't import the hum, so it can load first).
 export const sound = { humTick() {}, tapRedshift() {}, tapRelease() {}, TAP_CROSS: 0 };
-// For the entrance, which can't assign another module's bindings: clear the cues, set the verse's flow.
+// For the entrance, which can't assign another module's bindings: clear the cues.
 export function clearCues() { cues = []; }
-export { flare };
-export function setFlow(f, y) { flow = f; if (y !== undefined) flowY = y; }
+export { flare, lift };
 const snapTo = (a) => { aperture = a; voidEl.style.transform = a < 1 ? `translate(-50%, -50%) scale(${a.toFixed(4)})` : ''; layout(); drawStatic(); };
 
 export {
-  reduced, TAU, voidEl, verseEl, W, H, cx, cy, r, maxR, points, SHUT, SWING_MS, bezier, swing, aperture,
+  reduced, TAU, voidEl, W, H, cx, cy, r, maxR, points, SHUT, SWING_MS, bezier, swing, aperture,
   CLOSE_MS, DRAWIN_LEAD, expoInOut, layout, addTap, vis, dent, DENT_STRENGTH, DENT_RADIUS, DENT_RISE,
-  DENT_FOLLOW, DENT_LEAVE, lens, clock, cue, flowY, drawStatic, snapTo,
+  DENT_FOLLOW, DENT_LEAVE, lens, clock, cue, drawStatic, snapTo,
 };
