@@ -45,8 +45,8 @@ const plan = (() => {
 const markAt = plan[plan.length - 1].off + OUT + MARK_PAUSE;
 const landing = () => markAt + MARK_IN * 0.6;
 // The void grows with the verse: from the tap, one slow curve from the door's third to full, landing as
-// the mark comes in (so retuning HOLD moves it too). Quick enough at first to hold "Nothing." with room.
-const GROW_EASE = bezier(0.2, 0.25, 0.6, 1);
+// the mark comes in (so retuning HOLD moves it too). Quick at first, so each line has room inside it.
+const GROW_EASE = bezier(0.15, 0.45, 0.5, 1);
 const SKIP_MS = 800, SKIP_EASE = bezier(0.42, 0, 0.58, 1);   // a skip: the void to full on an ease-in-out
 // Then the end mark, the doors and the mark's way come in, MARK_AFTER s after the mark.
 const MARK_AFTER = 1.2;
