@@ -37,5 +37,3 @@ in just ratios, whose chord walked slowly between neighbours on the same
 root, breathed with the void and followed the ring. To bring it back, import
 it in `public/js/main.js` and give it a switch (id `hum`) and a hint (id
 `hum-hint`).
-
-When thehum.studio is live, add a quiet link beside thehum.works in the footer.

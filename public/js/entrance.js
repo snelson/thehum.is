@@ -1,7 +1,7 @@
 // The way in: the door, the verse a line at a time (its clock and cues), the mark it settles on, the skip
 // and its guards (#10), the field taps' input, and the reset. And the way out: the dive.
 import {
-  reduced, voidEl, cx, cy, r, maxR, SHUT, bezier, swing, aperture, CLOSE_MS, DRAWIN_LEAD, expoInOut,
+  reduced, voidEl, cx, cy, r, SHUT, bezier, swing, aperture, CLOSE_MS, DRAWIN_LEAD, expoInOut,
   addTap, clock, cue, snapTo, clearCues, flare, lift,
 } from './field.js';
 
