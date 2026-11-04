@@ -51,8 +51,7 @@
        decelerating) and goes over --line-out (drawn back in, on the draw-in's ease). The script reads both. */
     --line-in: 0.7s;
     --line-out: 0.55s;
-    /* The mark: the page's name, the Hum's own sign, at the void's centre. It comes in over --mark-in. */
-    --mark: clamp(48px, calc(var(--d) * 0.1), 60px);
+    /* The name, THE HUM, at the void's centre once the verse is done. It comes in over --mark-in. */
     --mark-in: 1.8s;
   }
   @media (min-width: 701px) and (orientation: portrait) {
@@ -165,7 +164,7 @@
   @keyframes appear { from { opacity: 0; } }
   /* The tap: the void opens (drawn by the canvas) and the name is pulled in as it goes, gone by the middle.
      Then the verse a line at a time at the void's centre (.on, one line at once), and after the last, the
-     mark comes in where the lines were (.marked) and stays. A skip lets the line go and brings the mark. */
+     name, THE HUM, comes in where the lines were (.marked) and stays. A skip lets the line go and brings the name. */
   @media (prefers-reduced-motion: no-preference) {
     .opening .door-in .door-name {   /* outranks :hover, which the tapping pointer is still on */
       opacity: 0; transform: scale(0.2);
@@ -190,7 +189,7 @@
       opacity: 1; visibility: visible; transform: none;
       transition: opacity calc(var(--mark-in) * 0.75) ease, transform var(--mark-in) cubic-bezier(0.33, 1, 0.68, 1), visibility 0s;
     }
-    /* Backwards: the end mark goes, and the mark is drawn into the void's centre the way the name is on the
+    /* Backwards: the end mark goes, and the name is drawn into the void's centre the way the name is on the
        way in (--draw-in-ease, --draw-in-time), as the void closes around it. */
     .leaving .name {
       opacity: 0; visibility: hidden; transform: scale(0.2);
@@ -199,7 +198,7 @@
   }
   /* Reduced motion: no pull, no opening, no sequence. The door fades out; the verse comes in whole and
      still (.reading), stays for as long as the lines would have taken (or until a tap or a key), then
-     gives way to the mark in one crossfade (.read-out). */
+     gives way to the name in one crossfade (.read-out). */
   @media (prefers-reduced-motion: reduce) {
     .opening .door { opacity: 0; transition: opacity 0.6s ease; }
     .opening .stage { transition: opacity 0.6s ease; }
@@ -253,48 +252,51 @@
   .js.reading .verse p + p { margin-top: calc(var(--verse-size) * var(--verse-lh) * 1.25); }
   .js.reading .verse p > span { position: static; transform: none; opacity: 1; }
 
-  /* The mark: the Hum's sign (the favicon's ring, without its square of sky) at the void's exact centre,
-     where the lines were. It is the page's name, and the switch for the hum: under it, while the hum is
-     off, "tap to hear". On, the mark itself hums: brighter, its glow swelling and settling every 2 s. */
+  /* The name: THE HUM at the void's exact centre, where the lines were, in the door's type. It is the switch
+     for the hum. Under it, while the hum is off, "tap to hear". On, the words themselves hum: brighter, with
+     a soft glow that swells and settles every 2 s. The tap target grows around the words, not the words. */
   .name {
     position: fixed; inset: 0; z-index: 2; margin: 0;
     display: grid; place-items: center;
     pointer-events: none;
-    font-size: inherit; font-weight: inherit;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-weight: 500; font-size: var(--inscription-size);
+    letter-spacing: 0.38em; text-transform: uppercase;
+    color: var(--ink-dim);
   }
   html:not(.js) .name { display: none; }
   .mark {
-    appearance: none; -webkit-appearance: none; background: none; border: 0; margin: 0; padding: 0;
-    font: inherit; cursor: pointer;
-    position: relative; pointer-events: auto;
-    display: grid; place-items: center;
-    width: calc(var(--mark) + 16px); height: calc(var(--mark) + 16px);   /* past the 44 px tap minimum at every size */
-    border-radius: 50%;
-    color: #b9b0da; text-decoration: none;
-    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    appearance: none; -webkit-appearance: none; background: none; border: 0; margin: 0; box-sizing: border-box;
+    font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit;
+    pointer-events: auto; opacity: 0.75;
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 44px; min-height: 44px; line-height: 13px;
+    padding: 0 14px 0 calc(14px + 0.38em);   /* the left pad balances the trailing tracking, so THE HUM stays centred */
+    cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    transition: opacity 300ms ease;
   }
-  .mark svg { width: var(--mark); height: var(--mark); display: block; overflow: visible; opacity: 0.9; transition: opacity 300ms ease, filter 300ms ease; }
-  .mark-way {
-    position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
-    padding: 6px 10px 10px;   /* the caption is part of the link: a tap on it counts */
-    font-family: "Newsreader", Georgia, serif; font-style: italic; font-weight: 300;
-    font-size: 14px; letter-spacing: 0.02em; white-space: nowrap;
-    opacity: 0.65; transition: opacity 300ms ease, color 300ms ease;
-  }
-  .mark:hover svg, .mark:focus-visible svg { opacity: 1; filter: drop-shadow(0 0 6px rgba(180,140,255,0.45)); }
-  .mark:hover .mark-way:not(.fade), .mark:focus-visible .mark-way:not(.fade) { opacity: 1; color: var(--ink); }
-  .mark-way.fade { opacity: 0; transition: opacity 1.6s ease; }
-  .mark[aria-pressed="true"] svg { opacity: 1; animation: hum-pulse 2s ease-in-out 1.5s infinite; }
+  .mark:hover { opacity: 0.95; }
+  .mark:focus { outline: none; }
+  .mark:focus-visible .hum-text { outline: 1px solid rgba(180,140,255,0.6); outline-offset: 5px; border-radius: 2px; }
+  .hum-text { transition: color 2s ease, text-shadow 2s ease; }
+  .mark[aria-pressed="true"] { opacity: 0.95; }
+  .mark[aria-pressed="true"] .hum-text { color: #cfc6ee; animation: hum-pulse 2s ease-in-out 1.5s infinite; }
   @keyframes hum-pulse {
-    0%, 100% { filter: drop-shadow(0 0 3px rgba(180,140,255,0.2)); }
-    50% { filter: drop-shadow(0 0 10px rgba(180,140,255,0.65)); }
+    0%, 100% { color: #b9b0da; text-shadow: 0 0 4px rgba(180,140,255,0.15); }
+    50% { color: #ece6ff; text-shadow: 0 0 9px rgba(180,140,255,0.55); }
   }
   @media (prefers-reduced-motion: reduce) {
-    .mark[aria-pressed="true"] svg { animation: none; filter: drop-shadow(0 0 7px rgba(180,140,255,0.5)); }
+    .mark[aria-pressed="true"] .hum-text { animation: none; }
   }
+  .hum-hint {
+    position: absolute; left: 0; right: 0; top: calc(50% + 12px); text-align: center;
+    font-family: "Newsreader", Georgia, serif; font-style: italic; font-weight: 300;
+    font-size: 11px; letter-spacing: 0.02em; text-transform: none;
+    opacity: 0.45; pointer-events: none;
+    transition: opacity 1.6s ease;
+  }
+  .hum-hint.fade { opacity: 0; }
   .name .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .mark:focus { outline: none; }
-  .mark:focus-visible { outline: 1px solid rgba(180,140,255,0.6); outline-offset: 4px; }
 
   /* The ways onward: studio and works as doors on the horizon, left and right of the verse. Wide: on the
      ring's centre line, just inside its rim (--door-in). Phones, where the rim's sides are off-screen:
@@ -336,17 +338,24 @@
   }
   .ways .way-studio { left: calc(50% - var(--d) / 2 + var(--door-in)); }
   .ways .way-works { left: calc(50% + var(--d) / 2 - var(--door-in)); }
-  /* thehum.ing: the hum, playing, on its own. A third door, quieter, at the bottom of the rim. */
-  .ways .way-ing { left: 50%; top: calc(50% + var(--d) / 2 - var(--door-in)); font-size: 13px; opacity: 0.7; }
-  .ways .way-ing .way-arrow { transform: rotate(90deg); }
-  .ways .way-ing:hover .way-arrow, .ways .way-ing:focus-visible .way-arrow { transform: rotate(90deg) translateX(3px); }
-  .ways .way-ing:hover span, .ways .way-ing:focus-visible span { transform: none; }
+  /* thehum.ing: only while the hum plays. A quiet line under the name, in the doors' type, a few seconds
+     after the sound starts (.hum-on, set by the script); it fades when the sound stops. Hidden, it is gone
+     for the keyboard and screen readers too. */
+  .ways .keep {
+    left: 50%; top: calc(50% + 22px); font-size: 13px; padding: 0 6px;   /* narrow enough to clear the phone's side doors */
+    visibility: hidden; opacity: 0;
+    transition: opacity 1.2s ease, visibility 0s linear 1.2s;
+  }
+  .hum-on:not(.quiet-mark):not(.entering):not(.opening):not(.leaving) .ways .keep {
+    visibility: visible; opacity: 0.6;
+    transition: opacity 1.6s ease, visibility 0s;
+  }
+  .hum-on:not(.quiet-mark):not(.entering):not(.opening):not(.leaving) .ways .keep:is(:hover, :focus-visible) { opacity: 1; }
+  .ways .keep:hover .way-arrow, .ways .keep:focus-visible .way-arrow { transform: translateX(3px); }
   @media (min-width: 701px) and (max-height: 500px) {   /* the void too small to hold them: just outside the rim */
     .ways { --door-in: -64px; }
-    .ways .way-ing { left: calc(50% + var(--d) / 2 + 64px); top: calc(50% + 44px); }
   }
   @media (max-width: 700px) {
-    .ways .way-ing { top: calc(50% + var(--d) / 2 - 56px); }
     .ways .way-studio { left: calc(env(safe-area-inset-left, 0px) + 20px); transform: translateY(-50%); }
     .ways .way-works { left: auto; right: calc(env(safe-area-inset-right, 0px) + 20px); transform: translateY(-50%); }
   }
@@ -377,13 +386,13 @@
   .verse-reset:focus { outline: none; }
   .verse-reset:focus-visible svg { outline: 1px solid rgba(180,140,255,0.6); outline-offset: 6px; border-radius: 50%; }
   .verse-reset svg { display: block; width: 10px; height: 10px; }
-  /* Hidden at the door, while the entrance runs (.quiet-mark: until the mark has come in), and first to go
-     on the reset. They arrive slowly (.mark-in), the last thing: the end mark, the doors, the mark's way. */
+  /* Hidden at the door, while the entrance runs (.quiet-mark: until the name has come in), and first to go
+     on the reset. They arrive slowly (.mark-in), the last thing: the end mark and the doors. */
   .entering .verse-reset, .opening .verse-reset, .quiet-mark .verse-reset,
   .entering .ways a, .opening .ways a, .quiet-mark .ways a,
-  .entering .mark-way, .opening .mark-way, .quiet-mark .mark-way { visibility: hidden; opacity: 0; }
-  .mark-in .mark-way { transition: opacity 1.5s ease; }
-  .leaving .mark-way { visibility: hidden; opacity: 0; transition: opacity 0.25s ease, visibility 0s linear 0.25s; }
+  .entering .hum-hint, .opening .hum-hint, .quiet-mark .hum-hint { visibility: hidden; opacity: 0; }
+  .mark-in .hum-hint { transition: opacity 1.5s ease; }
+  .leaving .hum-hint { visibility: hidden; opacity: 0; transition: opacity 0.25s ease, visibility 0s linear 0.25s; }
   .leaving .verse-reset { visibility: hidden; opacity: 0; transition: opacity 0.25s ease, visibility 0s linear 0.25s; }
   /* On the reset the doors fall in with the verse: drawn toward the centre, shrinking and fading, on its ease. */
   .ways { --inward: calc(var(--d) / 2 - var(--door-in)); }
@@ -394,7 +403,6 @@
   }
   .leaving .ways .way-studio { transform: translate(calc(-50% + var(--inward)), -50%) scale(0.2); }
   .leaving .ways .way-works { transform: translate(calc(-50% - var(--inward)), -50%) scale(0.2); }
-  .leaving .ways .way-ing { transform: translate(-50%, calc(-50% - var(--d) / 2 + 84px)) scale(0.2); }
   @media (max-width: 700px) {
     .ways { --inward: calc(50vw - 64px); }
     .leaving .ways .way-studio { transform: translate(var(--inward), -50%) scale(0.2); }
@@ -416,7 +424,6 @@
   }
   .diving .ways .way-studio { transform: translate(calc(-50% - var(--outward)), -50%) scale(1.6); }
   .diving .ways .way-works { transform: translate(calc(-50% + var(--outward)), -50%) scale(1.6); }
-  .diving .ways .way-ing { transform: translate(-50%, calc(-50% + var(--outward))) scale(1.6); }
   /* The click answers at once, under the dive: the chosen door snaps bright (--chosen-snap) and holds a
      moment before it fades on the way out, its caret jumping out (--chosen-jump); the other door goes
      quickly (--other-fade). */
@@ -430,7 +437,6 @@
   .diving .ways a.chosen .way-arrow { opacity: 1; transition: transform var(--chosen-snap) ease-out, opacity var(--chosen-snap) ease-out; }
   .diving .ways .way-studio.chosen .way-arrow { transform: translateX(calc(-1 * var(--chosen-jump))); }
   .diving .ways .way-works.chosen .way-arrow { transform: translateX(var(--chosen-jump)); }
-  .diving .ways .way-ing.chosen .way-arrow { transform: rotate(90deg) translateX(var(--chosen-jump)); }
   .diving .ways a:not(.chosen) { transition: transform var(--dive-time) var(--dive-ease), opacity var(--other-fade) ease-out; }
   @media (max-width: 700px) {
     .diving .ways .way-studio { transform: translate(calc(-1 * var(--outward)), -50%) scale(1.6); }
@@ -448,7 +454,7 @@
   @media (prefers-reduced-motion: reduce) {
     .ways a, .mark-in .ways a, .leaving .ways a { transition: none; }
     .leaving .ways .way-studio, .leaving .ways .way-works { transform: none; }
-    .leaving .ways .way-ing, .diving .ways .way-ing { transform: translate(-50%, -50%); }
+    .leaving .ways .keep, .diving .ways .keep { transform: translate(-50%, -50%); }
     @media (min-width: 701px) { .leaving .ways .way-studio, .leaving .ways .way-works { transform: translate(-50%, -50%); } }
     @media (max-width: 700px) { .leaving .ways .way-studio, .leaving .ways .way-works { transform: translateY(-50%); } }
   }
@@ -493,20 +499,13 @@
 <nav class="ways" aria-label="Onward">
   <a class="way-studio" href="https://thehum.studio" aria-label="thehum.studio"><svg class="way-arrow" viewBox="0 0 6 10" aria-hidden="true"><path d="M5 1 1 5l4 4"/></svg><span>studio</span></a>
   <a class="way-works" href="https://thehum.works" aria-label="thehum.works"><span>works</span><svg class="way-arrow" viewBox="0 0 6 10" aria-hidden="true"><path d="M1 1l4 4-4 4"/></svg></a>
-  <a class="way-ing" href="https://thehum.ing" aria-label="thehum.ing: the hum, playing"><span>hum.ing</span><svg class="way-arrow" viewBox="0 0 6 10" aria-hidden="true"><path d="M1 1l4 4-4 4"/></svg></a>
+  <a class="keep" href="https://thehum.ing" aria-label="Keep it playing at thehum.ing"><span>keep it playing at thehum.ing</span><svg class="way-arrow" viewBox="0 0 6 10" aria-hidden="true"><path d="M1 1l4 4-4 4"/></svg></a>
 </nav>
 
 <h1 class="name">
   <span class="sr">The Hum</span>
-  <button type="button" class="mark" id="hum" aria-pressed="false" aria-label="Turn the hum on"><svg viewBox="0 0 64 64" aria-hidden="true">
-    <defs>
-      <radialGradient id="mark-glow"><stop offset=".62" stop-color="#b48cff" stop-opacity="0"/><stop offset=".7" stop-color="#b48cff" stop-opacity=".3"/><stop offset="1" stop-color="#b48cff" stop-opacity="0"/></radialGradient>
-      <linearGradient id="mark-ring" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b48cff"/><stop offset=".25" stop-color="#ca7eea"/><stop offset=".5" stop-color="#b48cff"/><stop offset=".8" stop-color="#96a2ef"/><stop offset="1" stop-color="#b48cff"/></linearGradient>
-    </defs>
-    <circle cx="32" cy="32" r="31" fill="url(#mark-glow)"/>
-    <circle cx="32" cy="32" r="20.5" fill="#040309"/>
-    <circle cx="32" cy="32" r="20.5" fill="none" stroke="url(#mark-ring)" stroke-width="2"/>
-  </svg><span class="mark-way" id="hum-hint" aria-hidden="true" hidden>tap to hear</span></button>
+  <button type="button" class="mark" id="hum" aria-pressed="false" aria-label="Turn the hum on"><span class="hum-text">The Hum</span></button>
+  <span class="hum-hint" id="hum-hint" aria-hidden="true" hidden>tap to hear</span>
 </h1>
 
 <footer class="foot">
