@@ -338,20 +338,26 @@
   }
   .ways .way-studio { left: calc(50% - var(--d) / 2 + var(--door-in)); }
   .ways .way-works { left: calc(50% + var(--d) / 2 - var(--door-in)); }
-  /* thehum.ing: only while the hum plays. A quiet line under the name, in the doors' type, a few seconds
-     after the sound starts (.hum-on, set by the script); it fades when the sound stops. Hidden, it is gone
-     for the keyboard and screen readers too. */
-  .ways .keep {
-    left: 50%; top: calc(50% + 22px); font-size: 13px; padding: 0 6px;   /* narrow enough to clear the phone's side doors */
-    visibility: hidden; opacity: 0;
-    transition: opacity 1.2s ease, visibility 0s linear 1.2s;
+  /* thehum.ing: the hum on its own, as its own small sign (thehum.ing's icon, the ring without its square)
+     in the bottom-right corner, level with the end mark and inside the safe area. Low until hovered or
+     focused, when it brightens and its name shows beside it. It comes and goes with the other doors. */
+  .ways .way-ing {
+    top: auto; left: auto; transform: none; padding: 0; gap: 0;
+    right: max(12px, calc(env(safe-area-inset-right, 0px) + 6px));
+    bottom: calc(var(--footer-gap) + env(safe-area-inset-bottom, 0px));
+    width: 44px; height: 44px; opacity: 0.5;
   }
-  .hum-on:not(.quiet-mark):not(.entering):not(.opening):not(.leaving) .ways .keep {
-    visibility: visible; opacity: 0.6;
-    transition: opacity 1.6s ease, visibility 0s;
+  .way-ing svg { width: 18px; height: 18px; display: block; transition: filter 300ms ease; }
+  .way-ing .ing-tip {
+    position: absolute; right: 100%; top: 50%; transform: translateY(-50%);
+    font-size: 13px; white-space: nowrap; opacity: 0; pointer-events: none;
+    transition: opacity 300ms ease;
   }
-  .hum-on:not(.quiet-mark):not(.entering):not(.opening):not(.leaving) .ways .keep:is(:hover, :focus-visible) { opacity: 1; }
-  .ways .keep:hover .way-arrow, .ways .keep:focus-visible .way-arrow { transform: translateX(3px); }
+  .ways .way-ing:hover, .ways .way-ing:focus-visible { opacity: 0.9; }
+  .ways .way-ing:is(:hover, :focus-visible) svg { filter: drop-shadow(0 0 4px rgba(180,140,255,0.5)); }
+  .ways .way-ing:is(:hover, :focus-visible) .ing-tip { opacity: 0.85; transform: translateY(-50%); }
+  .ways .way-ing:focus-visible .ing-tip { outline: none; }
+  .ways .way-ing:focus-visible { outline: 1px solid rgba(180,140,255,0.6); outline-offset: -6px; border-radius: 50%; }
   @media (min-width: 701px) and (max-height: 500px) {   /* the void too small to hold them: just outside the rim */
     .ways { --door-in: -64px; }
   }
@@ -424,6 +430,7 @@
   }
   .diving .ways .way-studio { transform: translate(calc(-50% - var(--outward)), -50%) scale(1.6); }
   .diving .ways .way-works { transform: translate(calc(-50% + var(--outward)), -50%) scale(1.6); }
+  .diving .ways .way-ing { transform: scale(1.6); }
   /* The click answers at once, under the dive: the chosen door snaps bright (--chosen-snap) and holds a
      moment before it fades on the way out, its caret jumping out (--chosen-jump); the other door goes
      quickly (--other-fade). */
@@ -454,7 +461,7 @@
   @media (prefers-reduced-motion: reduce) {
     .ways a, .mark-in .ways a, .leaving .ways a { transition: none; }
     .leaving .ways .way-studio, .leaving .ways .way-works { transform: none; }
-    .leaving .ways .keep, .diving .ways .keep { transform: translate(-50%, -50%); }
+    .leaving .ways .way-ing, .diving .ways .way-ing { transform: none; }
     @media (min-width: 701px) { .leaving .ways .way-studio, .leaving .ways .way-works { transform: translate(-50%, -50%); } }
     @media (max-width: 700px) { .leaving .ways .way-studio, .leaving .ways .way-works { transform: translateY(-50%); } }
   }
@@ -499,7 +506,7 @@
 <nav class="ways" aria-label="Onward">
   <a class="way-studio" href="https://thehum.studio" aria-label="thehum.studio"><svg class="way-arrow" viewBox="0 0 6 10" aria-hidden="true"><path d="M5 1 1 5l4 4"/></svg><span>studio</span></a>
   <a class="way-works" href="https://thehum.works" aria-label="thehum.works"><span>works</span><svg class="way-arrow" viewBox="0 0 6 10" aria-hidden="true"><path d="M1 1l4 4-4 4"/></svg></a>
-  <a class="keep" href="https://thehum.ing" aria-label="Keep it playing at thehum.ing"><span>keep it playing at thehum.ing</span><svg class="way-arrow" viewBox="0 0 6 10" aria-hidden="true"><path d="M1 1l4 4-4 4"/></svg></a>
+  <a class="way-ing" href="https://thehum.ing" aria-label="thehum.ing"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="ing-ring" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b48cff"/><stop offset=".25" stop-color="#ca7eea"/><stop offset=".5" stop-color="#b48cff"/><stop offset=".8" stop-color="#96a2ef"/><stop offset="1" stop-color="#b48cff"/></linearGradient></defs><circle cx="32" cy="32" r="22" fill="#040309" stroke="url(#ing-ring)" stroke-width="5"/></svg><span class="ing-tip" aria-hidden="true">thehum.ing</span></a>
 </nav>
 
 <h1 class="name">

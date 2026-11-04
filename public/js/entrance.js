@@ -11,15 +11,6 @@ import { btn, on, graph, tearDown, destroy, tapTone, setAimTuneIn, diveFade, div
 // way the entrance is remembered. The end mark at the foot runs it backwards, to the door.
 const root = document.documentElement, door = document.querySelector('.door'), reset = document.querySelector('.verse-reset');
 const mark = btn;   // the name at the centre is the hum's switch
-// The way to thehum.ing shows only while the hum plays: KEEP_AFTER s after it starts (.hum-on), and it goes
-// as soon as it stops. hum.js handles the switch's click first (it loads first), so aria-pressed is current.
-const KEEP_AFTER = 3;
-let keepTimer = 0;
-btn.addEventListener('click', () => {
-  clearTimeout(keepTimer);
-  if (btn.getAttribute('aria-pressed') === 'true') keepTimer = setTimeout(() => root.classList.add('hum-on'), KEEP_AFTER * 1000);
-  else root.classList.remove('hum-on');
-});
 const lines = [...document.querySelectorAll('.verse p > span')];
 const breaks = new Set([...document.querySelectorAll('.verse p + p > span:first-child')].map((l) => lines.indexOf(l)));
 // The verse at reading pace, one line on screen at once, at the void's centre. A line comes in (IN s, the

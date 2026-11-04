@@ -22,7 +22,10 @@ reading pace and goes before the next (about 30 s in all). Then THE HUM
 comes in at the centre, where the lines were, and stays: the page's name, in
 the door's type. studio and works sit on the horizon as doors, and the end
 mark at the foot, a small turning arrow, plays the entrance again from the
-door. A tap, a key or a wheel skips to the name. A return visit opens on it.
+door. thehum.ing, the hum on its own, is a small ring in the bottom-right
+corner (its own icon), low until hovered or focused, when its name shows
+beside it; it arrives with the doors and leaves with the same dive. A tap, a
+key or a wheel skips to the name. A return visit opens on it.
 The verse stays in the page for screen readers, hidden to the eye only;
 without JavaScript it shows as a still block. Reduced motion: no sequence;
 the verse comes in whole and still, then crossfades to the name after 12 s,
@@ -30,9 +33,7 @@ or on a tap or a key.
 
 Sound: tap THE HUM to toggle (off by default; "tap to hear" under it while
 it's off). On, the words hum: brighter, with a glow that swells every 2 s.
-A few seconds after the sound starts, a quiet line comes in under the name,
-"keep it playing at thehum.ing", the way to the hum on its own; it goes when
-the sound stops, and isn't there at all while the page is silent. The sound
+The sound
 (`public/js/hum.js`) is a generative drone on the year tone, Earth's orbit
 raised 32 octaves (136.10 Hz; root an octave down at 68.05 Hz, C♯), in just
 ratios: a synth floor, upper harmony and a humming choir. The chord walks
