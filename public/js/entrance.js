@@ -1,7 +1,7 @@
 // The way in: the door, the verse a line at a time (its clock and cues), the name it settles on, the skip
 // and its guards (#10), the field taps' input, and the reset. And the way out: the dive.
 import {
-  reduced, voidEl, cx, cy, r, maxR, SHUT, bezier, swing, aperture, CLOSE_MS, DRAWIN_LEAD, expoInOut,
+  reduced, cx, cy, r, maxR, SHUT, bezier, swing, aperture, CLOSE_MS, DRAWIN_LEAD, expoInOut,
   addTap, clock, cue, snapTo, clearCues, flare, lift,
 } from './field.js';
 import { btn, on, graph, tearDown, destroy, tapTone, setAimTuneIn, diveFade, diveFall } from './hum.js';
@@ -208,16 +208,17 @@ door.querySelector('.door-quiet').addEventListener('click', () => enter(false));
 reset.addEventListener('click', leave);
 
 // ---- The way out ----------------------------------------------------------
-// Leaving through a door dives into the void: together, over DIVE_MS and gathering speed, the void opens
-// past the screen (to DIVE_REACH times the half-diagonal, so its dark fills the corners; the ring, glow and
-// infall follow), the doors fly outward, the name and the end mark fade, and the hum falls away. Then the
-// next page, once. A new-tab click goes straight through.
+// Leaving through a door implodes into the void: together, over DIVE_MS and gathering speed, the void
+// closes to a point at the centre (the ring, glow and infall follow it in), the verse, the name and the
+// doors are drawn in after it, the chosen door last, the end mark fades, and the hum falls away. Then
+// the next page, once. A new-tab click goes straight through.
 // Reduced motion: a quick fade to dark (DIVE_DARK ms), then the next page. Back (from the cache): as before.
-const DIVE_MS = 1100, DIVE_REACH = 1.15, DIVE_DARK = 350, DIVE_EASE = bezier(0.7, 0, 0.84, 0);   // easeInExpo: a slow lean, then the fall
-// Then a hang in the void before the next page (DIVE_HANG ms; DIVE_HANG_REDUCED under reduced motion), the
-// field still turning, while the hum's fall reaches its depths and fades.
+const DIVE_MS = 1100, DIVE_DARK = 350, DIVE_EASE = bezier(0.7, 0, 0.84, 0);   // easeInExpo: a slow lean, then the fall
+// Then a hang in the void before the next page (DIVE_HANG ms; DIVE_HANG_REDUCED under reduced motion), while
+// the hum's fall reaches its depths and fades. As the hang begins the stage goes out (.dark, over the CSS's
+// --dive-out), so the hang ends on a dark beat and a light page next doesn't flash.
 const DIVE_HANG = 1100, DIVE_HANG_REDUCED = 250;
-let diving = false;
+let diving = false, darkTimer = 0;
 function go(href) {
   if (location.hash === '#humdebug' && window.__holdNav) { window.__navs = (window.__navs || 0) + 1; window.__navTo = href; window.__navAt = performance.now(); return; }
   location.href = href;
@@ -233,12 +234,16 @@ document.querySelectorAll('.ways a').forEach((a) => a.addEventListener('click', 
   diveFade(secs / 1000, hang / 1000);
   root.classList.add('diving');
   if (reduced) root.classList.add('dark');
-  else swing((Math.hypot(innerWidth, innerHeight) / 2 * DIVE_REACH) / (voidEl.offsetWidth / 2), clock, DIVE_MS, DIVE_EASE);
+  else {
+    swing(0, clock, DIVE_MS, DIVE_EASE);   // the void to a point
+    darkTimer = setTimeout(() => root.classList.add('dark'), DIVE_MS);   // as it lands: the stage goes out
+  }
   setTimeout(() => go(a.href), secs + hang + 30);
 }));
 addEventListener('pageshow', (e) => {   // back from the next page: as it was before the dive
   if (!e.persisted || !diving) return;
   diving = false;
+  clearTimeout(darkTimer);
   root.classList.remove('diving', 'dark');
   document.querySelectorAll('.ways a.chosen').forEach((x) => x.classList.remove('chosen'));
   snapTo(1);

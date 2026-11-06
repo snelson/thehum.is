@@ -180,12 +180,14 @@ function drawRing(alpha, now) {
   ctx.save();
   ctx.globalAlpha = alpha;
   const g0 = glow.s * r / r0;   // the glow was drawn for r0; follow the breathing edge
-  ctx.drawImage(glow.c, cx - g0 / 2, cy - g0 / 2, g0, g0);
-  if (vis.lift > 0.001) { ctx.globalAlpha = alpha * LIFT * vis.lift; ctx.drawImage(glow.c, cx - g0 / 2, cy - g0 / 2, g0, g0); ctx.globalAlpha = alpha; }
-  if (vis.flare > 0.001) { ctx.globalAlpha = Math.min(1, alpha * FLARE * vis.flare); ctx.drawImage(glow.c, cx - g0 / 2, cy - g0 / 2, g0, g0); ctx.globalAlpha = alpha; }
-  if (pz > 0.01) {
-    // Brighter on the swell, never bigger: the glow's inner edge must stay on the horizon.
-    ctx.globalAlpha = alpha * 0.6 * pz; ctx.drawImage(glow.c, cx - g0 / 2, cy - g0 / 2, g0, g0); ctx.globalAlpha = alpha;
+  if (g0 >= 1) {   // closed to a point on the dive: no glow left to draw
+    ctx.drawImage(glow.c, cx - g0 / 2, cy - g0 / 2, g0, g0);
+    if (vis.lift > 0.001) { ctx.globalAlpha = alpha * LIFT * vis.lift; ctx.drawImage(glow.c, cx - g0 / 2, cy - g0 / 2, g0, g0); ctx.globalAlpha = alpha; }
+    if (vis.flare > 0.001) { ctx.globalAlpha = Math.min(1, alpha * FLARE * vis.flare); ctx.drawImage(glow.c, cx - g0 / 2, cy - g0 / 2, g0, g0); ctx.globalAlpha = alpha; }
+    if (pz > 0.01) {
+      // Brighter on the swell, never bigger: the glow's inner edge must stay on the horizon.
+      ctx.globalAlpha = alpha * 0.6 * pz; ctx.drawImage(glow.c, cx - g0 / 2, cy - g0 / 2, g0, g0); ctx.globalAlpha = alpha;
+    }
   }
   // Outer profile: one soft band fading ~14px outward, fuller where the ring is bright.
   if ('filter' in ctx) {
@@ -285,8 +287,8 @@ function frame(now) {
     aperture = apFrom + (apTo - apFrom) * apEase(p);
     if (p === 1) { apAt = 0; lastScale = -1; }   // land exactly
   }
-  const sc = 1 + 0.045 * (vis.pulse ? vis.pulse() : 0), s = aperture * sc;
-  r = r0 * s;
+  const sc = 1 + 0.045 * (vis.pulse ? vis.pulse() : 0), s = Math.max(0, aperture * sc);
+  r = r0 * s;   // down to 0 on the dive: the ring's arcs take r as a radius, which must never go below 0
   if (Math.abs(s - lastScale) > 0.0002) { voidEl.style.transform = `translate(-50%, -50%) scale(${s.toFixed(4)})`; lastScale = s; }
   // The door's lift eases toward its target: up over ~0.5 s, down over ~0.8 s (fast once the entrance starts).
   const lt = liftTarget();
