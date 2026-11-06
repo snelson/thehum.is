@@ -74,6 +74,7 @@ function layout() {
   } else ringGrad = RING;
 
   const target = W < 700 ? 130 : 300;   // tuned so the steady state matches the opening sky
+  if (fall) return;   // mid-dive (a turn, a resize): the sky is being swallowed, not sown
   while (points.length < target) points.push(spawn(true));
   points.length = target;
 }
@@ -110,24 +111,39 @@ function addTap(x, y, voice) {
   points.push(p);
   return p;
 }
+// The dive's pull (implode()): over the void's own collapse (ms, on its ease) every point's distance outside
+// the rim is drawn down with it, on top of gravity, so the near ones run into the rim first and the far
+// ones are carried in after, all of them swallowed by the time the void is a point. Nothing is reborn
+// meanwhile. Each point remembers where it was last frame (pr, pa), for its streak.
+let fall = null;
+function implode(ms, ease) { fall = { at: clock, ms, ease, e: 0, r }; }
+function unimplode() { fall = null; points.length = 0; }   // back from the dive: layout() sows a new sky
 function step(dt) {
+  let keep = 1;   // how much of each point's distance outside the rim this frame keeps
+  if (fall) {
+    const e = fall.ease(Math.min(1, Math.max(0, (clock - fall.at) / fall.ms)));
+    keep = e >= 1 || fall.e >= 1 ? 0 : (1 - e) / (1 - fall.e); fall.e = e;
+  }
   for (let i = 0; i < points.length; i++) {
     const p = points[i];
     const d = p.rad - r;
+    if (fall) { p.pr = p.rad; p.pa = p.a; }
     // Gravity: a slow drift far out, then the pull runs away — speed grows exponentially
     // over the last ~100 px (≈7 px/s far, ≈50 at 60 px, ≈170 at the edge), and the swirl
     // tightens with it, so each point spirals and is swallowed.
     const pull = Math.exp(-d / 38);
     p.rad -= (p.tap ? (TAP_FALL + 175 * pull) * Math.min(1, (p.tap.age += dt) / TAP_EASE) : 7 + 175 * pull) * dt;
     p.a += (p.w * 120 / Math.max(p.rad, 1)) * (1 + 3 * pull) * dt;
+    if (fall) p.rad = r + Math.max(0, p.rad - fall.r) * keep;
     if (p.tap) {   // a tapped point: its tone sinks as it falls, and goes as it crosses
       p.tap.glow = Math.max(0, p.tap.glow - dt / TAP_GLOW);
       if (p.tap.voice) sound.tapRedshift(p.tap.voice, 1 - Math.max(0, d - 6) / p.tap.d0);
       if (p.rad <= r + 6) { if (p.tap.voice) sound.tapRelease(p.tap.voice, sound.TAP_CROSS); points.splice(i--, 1); }
       continue;
     }
-    if (p.rad <= r + 6) points[i] = spawn(false);   // nothing enters the ring
+    if (p.rad <= r + 6) { if (fall) points.splice(i--, 1); else points[i] = spawn(false); }   // nothing enters the ring
   }
+  if (fall) fall.r = r;
 }
 
 // Doppler beaming: a real photon ring is brighter on the side moving toward us.
@@ -245,6 +261,7 @@ function lens(x, y) {
   const k = (DENT_STRENGTH * dent.m * q * Math.exp(-q * q)) / d;
   return [dx * k, dy * k];
 }
+const STREAK = 24;
 function drawPoints() {
   for (const p of points) {
     let x = cx + Math.cos(p.a) * p.rad, y = cy + Math.sin(p.a) * p.rad;
@@ -255,6 +272,15 @@ function drawPoints() {
     const lit = p.tap ? p.tap.glow : 0;   // a tapped point starts brighter and settles to the field's own
     const alpha = Math.min(1, (0.2 + 0.55 * t) * edge + 0.6 * lit), size = p.size * (0.6 + 0.4 * edge) * (1 + 0.6 * lit);
     ctx.fillStyle = rgba(mix(rgba0(FAR), rgba0(NEAR), t), alpha);
+    if (fall && p.pr !== undefined) {   // in the dive: a short streak back along the frame's travel, up to STREAK px
+      const px = cx + Math.cos(p.pa) * p.pr + (x - cx - Math.cos(p.a) * p.rad), py = cy + Math.sin(p.pa) * p.pr + (y - cy - Math.sin(p.a) * p.rad);
+      const len = Math.hypot(x - px, y - py), k = len > STREAK ? STREAK / len : 1;
+      if (len > size) {
+        ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = size; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(x + (px - x) * k, y + (py - y) * k); ctx.lineTo(x, y); ctx.stroke();
+        continue;
+      }
+    }
     ctx.fillRect(x - size / 2, y - size / 2, size, size);
   }
 }
@@ -357,7 +383,7 @@ if (reduced) {
 export const sound = { humTick() {}, tapRedshift() {}, tapRelease() {}, TAP_CROSS: 0 };
 // For the entrance, which can't assign another module's bindings: clear the cues.
 export function clearCues() { cues = []; }
-export { flare, lift };
+export { flare, lift, implode, unimplode };
 const snapTo = (a) => { aperture = a; voidEl.style.transform = a < 1 ? `translate(-50%, -50%) scale(${a.toFixed(4)})` : ''; layout(); drawStatic(); };
 
 export {

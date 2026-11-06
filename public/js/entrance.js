@@ -2,7 +2,7 @@
 // and its guards (#10), the field taps' input, and the reset. And the way out: the dive.
 import {
   reduced, cx, cy, r, maxR, SHUT, bezier, swing, aperture, CLOSE_MS, DRAWIN_LEAD, expoInOut,
-  addTap, clock, cue, snapTo, clearCues, flare, lift,
+  addTap, clock, cue, snapTo, clearCues, flare, lift, implode, unimplode,
 } from './field.js';
 import { btn, on, graph, tearDown, destroy, tapTone, setAimTuneIn, diveFade, diveFall } from './hum.js';
 
@@ -209,9 +209,10 @@ reset.addEventListener('click', leave);
 
 // ---- The way out ----------------------------------------------------------
 // Leaving through a door implodes into the void: together, over DIVE_MS and gathering speed, the void
-// closes to a point at the centre (the ring, glow and infall follow it in), the verse, the name and the
-// doors are drawn in after it, the chosen door last, the end mark fades, and the hum falls away. Then
-// the next page, once. A new-tab click goes straight through.
+// closes to a point at the centre (the ring and glow follow it in, and the whole sky is pulled in after
+// it and swallowed: implode()), the verse, the name and the doors are drawn in after it, the chosen door
+// last, the end mark fades, and the hum falls away. Then the next page, once. A new-tab click goes
+// straight through.
 // Reduced motion: a quick fade to dark (DIVE_DARK ms), then the next page. Back (from the cache): as before.
 const DIVE_MS = 1100, DIVE_DARK = 350, DIVE_EASE = bezier(0.7, 0, 0.84, 0);   // easeInExpo: a slow lean, then the fall
 // Then a hang in the void before the next page (DIVE_HANG ms; DIVE_HANG_REDUCED under reduced motion), while
@@ -236,6 +237,7 @@ document.querySelectorAll('.ways a').forEach((a) => a.addEventListener('click', 
   if (reduced) root.classList.add('dark');
   else {
     swing(0, clock, DIVE_MS, DIVE_EASE);   // the void to a point
+    implode(DIVE_MS, DIVE_EASE);   // and the sky after it
     darkTimer = setTimeout(() => root.classList.add('dark'), DIVE_MS);   // as it lands: the stage goes out
   }
   setTimeout(() => go(a.href), secs + hang + 30);
@@ -246,7 +248,7 @@ addEventListener('pageshow', (e) => {   // back from the next page: as it was be
   clearTimeout(darkTimer);
   root.classList.remove('diving', 'dark');
   document.querySelectorAll('.ways a.chosen').forEach((x) => x.classList.remove('chosen'));
-  snapTo(1);
+  unimplode(); snapTo(1);   // a fresh sky
 });
 
 export { landing };

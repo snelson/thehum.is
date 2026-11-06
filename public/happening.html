@@ -458,6 +458,9 @@
     transition: transform var(--dive-time) var(--dive-ease), color var(--chosen-snap) ease-out;
   }
   @keyframes chosen { 0% { opacity: 0.85; } 9% { opacity: 1; } 55% { opacity: 0.9; } 100% { opacity: 0; } }
+  @media (prefers-reduced-motion: no-preference) {   /* thehum.ing, from the far corner: a gentler ease (in-out), so the travel shows before it fades */
+    .diving .ways .way-ing.chosen { transition: transform var(--dive-time) cubic-bezier(0.45, 0, 0.55, 1), color var(--chosen-snap) ease-out; }
+  }
   .diving .ways a.chosen .way-arrow { opacity: 1; transition: transform var(--chosen-snap) ease-out, opacity var(--chosen-snap) ease-out; }
   .diving .ways .way-studio.chosen .way-arrow { transform: translateX(calc(-1 * var(--chosen-jump))); }
   .diving .ways .way-works.chosen .way-arrow { transform: translateX(var(--chosen-jump)); }
